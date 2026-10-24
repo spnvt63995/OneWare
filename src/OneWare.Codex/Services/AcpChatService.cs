@@ -78,7 +78,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         public CancellationTokenSource Cancellation { get; } = CancellationTokenSource.CreateLinkedTokenSource(token);
         public ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> Calls { get; } = new();
         public HashSet<string> Claimed { get; } = [];
-        public HashSet<string> BackendCalls { get; } = [];
+        public Dictionary<string, AcpRuntimeToolCall> BackendCalls { get; } = [];
         public HashSet<string> PlanReviews { get; } = [];
         public HashSet<string> TransportApprovals { get; } = [];
         public StringBuilder Text { get; } = new();
@@ -425,16 +425,22 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
                     }
                     else
                     {
-                        turn.BackendCalls.Add(id);
-                        Emit(new ChatToolExecutionStartEvent(Text(update, "title") ?? "ACP tool", id));
+                        var call = new AcpRuntimeToolCall();
+                        call.Update(update);
+                        turn.BackendCalls.Add(id, call);
+                        Emit(new ChatToolExecutionStartEvent(Text(update, "title") ?? "ACP tool", id)
+                            { Detail = call.Detail });
+                        PublishRuntimeTool(turn, id, call, update);
                     }
 
                     break;
                 case "tool_call_update":
-                    var completed = Text(update, "toolCallId");
-                    if (completed != null && Text(update, "status") is "completed" or "failed" &&
-                        turn.BackendCalls.Remove(completed))
-                        Emit(new ChatToolExecutionCompleteEvent(completed, Text(update, "status") == "completed"));
+                    var updated = Text(update, "toolCallId");
+                    if (updated != null && turn.BackendCalls.TryGetValue(updated, out var active))
+                    {
+                        active.Update(update);
+                        PublishRuntimeTool(turn, updated, active, update);
+                    }
                     break;
             }
         }

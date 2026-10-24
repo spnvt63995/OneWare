@@ -54,6 +54,20 @@ public class ChatMessageToolViewModel : ObservableObject, IChatMessage, IEstimat
         set => SetProperty(ref field, value);
     }
 
+    private string? _progressDetail;
+    private string? _progressOutput;
+    internal bool HasProgress { get; private set; }
+
+    internal void UpdateProgress(string? detail, string? output)
+    {
+        if (!HasProgress) _progressDetail = ToolOutput;
+        HasProgress = true;
+        if (detail != null) _progressDetail = detail;
+        if (output != null) _progressOutput = output;
+        ToolOutput = string.IsNullOrWhiteSpace(_progressDetail) ? _progressOutput :
+            string.IsNullOrWhiteSpace(_progressOutput) ? _progressDetail : _progressDetail + "\n" + _progressOutput;
+    }
+
     public double EstimateHeight(double width)
     {
         const double header = 36;

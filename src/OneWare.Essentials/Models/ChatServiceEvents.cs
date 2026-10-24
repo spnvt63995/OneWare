@@ -74,6 +74,15 @@ public sealed class ChatToolExecutionStartEvent(string tool, string? toolCallId 
     public string? Detail { get; init; }
 }
 
+/// <summary>Current display snapshots for a running tool. Null fields keep the previous value.</summary>
+public sealed class ChatToolExecutionUpdateEvent(string toolCallId, string? detail = null, string? output = null)
+    : ChatEvent()
+{
+    public string ToolCallId { get; } = toolCallId;
+    public string? Detail { get; } = detail;
+    public string? Output { get; } = output;
+}
+
 /// <summary>
 /// Completion of a tool call previously announced by <see cref="ChatToolExecutionStartEvent"/>.
 /// </summary>

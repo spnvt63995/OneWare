@@ -34,7 +34,9 @@ never silently replaced.
 
 Plugins supply tools, skills and agents through the shared host. Background delegated work allows
 the parent conversation to continue. Follow-up instructions target the existing child, and completed
-results are delivered to the parent conversation.
+results are delivered to the parent conversation. Expand a child agent's tool card to see its input,
+progress and result, including runtime-provided failure details. Long results are shortened for display;
+image, diff and terminal references are not rendered as text results.
 
 The managed ACP runtime still uses Codex CLI internally. Its internal App Server process is required
 by that runtime; it is separate from the retired direct App Server provider.
