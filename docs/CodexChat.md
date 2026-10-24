@@ -16,6 +16,22 @@ The footer exposes model, reasoning and approval choices together with usage/con
 Supported choices come from the connected runtime. Saved choices apply to subsequent work; changes
 during a turn follow the provider's synchronization and ownership rules.
 
+Use the **/** button next to the model picker to search the current session's commands, read their
+descriptions and enter arguments. You can also type a command directly in the chat input.
+Supported commands are `/status`, `/skills`, `/compact`, `/review`, `/review-branch <branch>` and
+`/review-commit <commit>`, when advertised by the runtime. Commands run between responses and use
+the existing Stop button. Attachments remain in the draft for the next ordinary message.
+Review commands keep workspace operations read-only. Use the existing OneWare controls for Plan,
+account sign-out and conversation renaming; commands that need additional integration show a reason
+in the picker instead of changing those states independently.
+
+The runtime may not persist a new session until it receives an ordinary message. OneWare records
+whether a conversation has only used `/status` or `/skills`, and can reconnect such a conversation
+after restarting while keeping its saved chat entry and model selection. Once any other prompt is
+dispatched, including a review or compaction, it requires the original session to resume. Missing
+sessions with prior work or older bindings without this information show recovery guidance and are
+never silently replaced.
+
 Plugins supply tools, skills and agents through the shared host. Background delegated work allows
 the parent conversation to continue. Follow-up instructions target the existing child, and completed
 results are delivered to the parent conversation.

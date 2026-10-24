@@ -347,11 +347,14 @@ internal sealed class AcpPeer : IAgentConnection
     private TaskCompletionSource<JsonElement> _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private JsonElement _mcp;
     public bool ReplayOnResume { get; set; }
+    public object[]? AdvertisedCommands { get; set; }
     public bool SupportsResume { get; set; } = true;
     public string? LastResumeMethod { get; private set; }
     public bool BlockInitialization { get; set; }
     public TaskCompletionSource<bool> Initializing { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     public bool FailResume { get; set; }
+    public Exception? ResumeError { get; set; }
+    public Exception? NewSessionError { get; set; }
     public string? MissingOption { get; set; }
     public List<JsonElement> Prompts { get; } = [];
     public List<AcpSelection> PromptSelections { get; } = [];
@@ -413,11 +416,16 @@ internal sealed class AcpPeer : IAgentConnection
 
         if (method is "session/new" or "session/resume" or "session/load")
         {
-            if (method == "session/new") NewSessions++;
+            if (method == "session/new")
+            {
+                NewSessions++;
+                if (NewSessionError != null) throw NewSessionError;
+            }
             else
             {
                 Resumes++;
                 LastResumeMethod = method;
+                if (ResumeError != null) throw ResumeError;
                 if (FailResume) throw new IOException("resume unavailable");
                 if (ReplayOnResume)
                 {
@@ -430,6 +438,8 @@ internal sealed class AcpPeer : IAgentConnection
             }
 
             _mcp = p.GetProperty("mcpServers")[0].Clone();
+            if (AdvertisedCommands != null)
+                Update(new { sessionUpdate = "available_commands_update", availableCommands = AdvertisedCommands });
             return Json(new { sessionId = Id, configOptions = Config() });
         }
 
@@ -540,6 +550,8 @@ internal sealed class AcpPeer : IAgentConnection
         PromptStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
         _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
+
+    public void CompleteSilently() => _response.TrySetResult(Json(new { stopReason = "end_turn" }));
 
     public void Drop()
     {

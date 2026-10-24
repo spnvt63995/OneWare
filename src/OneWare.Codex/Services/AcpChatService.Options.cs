@@ -106,7 +106,7 @@ internal sealed partial class AcpChatService
     public Task SelectModelAsync(AcpOptionChoice choice) => ChangeOptionsAsync("model", choice.Value);
     public Task SelectReasoningAsync(AcpOptionChoice choice) => ChangeOptionsAsync("reasoning_effort", choice.Value);
 
-    private async Task ChangeOptionsAsync(string? id, string? value)
+    private async Task ChangeOptionsAsync(string? id, string? value, bool loadingCommands = false)
     {
         // The active response keeps its model. ACP accepts session config changes for
         // the next prompt; do not wait on the gate held for the whole running turn.
@@ -197,7 +197,9 @@ internal sealed partial class AcpChatService
         }
         catch (Exception error)
         {
-            _optionsError = "Could not update model options. Try again.";
+            _optionsError = error is SessionResumeException ? error.Message : loadingCommands
+                ? "Could not load ACP commands. Check the runtime and account, then reopen this menu to retry."
+                : "Could not update model options. Try again.";
             Failure(error);
         }
         finally
@@ -242,6 +244,7 @@ internal sealed partial class AcpChatService
     private void RefreshOptionsProjection()
     {
         RefreshFooter();
+        RefreshCommandProjection();
         var projection = ++_projection;
         IsProjectingOptions = true;
         var models = Choices("model");

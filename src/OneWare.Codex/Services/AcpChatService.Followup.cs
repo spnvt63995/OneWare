@@ -99,6 +99,7 @@ internal sealed partial class AcpChatService
             return OneWareMcpResult.Failure("The agent is busy or the originating conversation changed.");
         }
 
+        owner.SaveDelegation(context);
         Emit(new ChatSubAgentStartedEvent(context.Id, original.DisplayName +
             (followup ? " · Follow-up " + context.Number : ""))
         {

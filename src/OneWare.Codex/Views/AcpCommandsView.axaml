@@ -1,0 +1,40 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:OneWare.Codex.Services"
+             x:Class="OneWare.Codex.Views.AcpCommandsView"
+             x:DataType="services:AcpChatService">
+    <Button Name="CommandsButton" Classes="small" Content="/" IsEnabled="{Binding CanOpenCommands}"
+            ToolTip.Tip="ACP commands" AutomationProperties.Name="ACP commands">
+        <Button.Flyout>
+            <Flyout FlyoutPresenterClasses="flush" Placement="TopEdgeAlignedLeft">
+                <Grid Width="340" MaxHeight="420" RowDefinitions="Auto,*,Auto" RowSpacing="4">
+                    <TextBox Name="CommandSearch" Classes="search" Watermark="Search commands…"
+                             AutomationProperties.Name="Search ACP commands"
+                             Text="{Binding CommandSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <ListBox Name="CommandList" Grid.Row="1" Classes="transparent" MaxHeight="230"
+                             ItemsSource="{Binding FilteredCommands}"
+                             SelectedItem="{Binding SelectedCommand, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="services:AcpCommandChoice">
+                                <StackPanel Spacing="2" MaxWidth="300">
+                                    <TextBlock Text="{Binding Label}" Classes="semibold" />
+                                    <TextBlock Text="{Binding Description}" Classes="caption" TextWrapping="Wrap" />
+                                    <TextBlock Text="{Binding UnavailableReason}" Classes="caption"
+                                               IsVisible="{Binding !IsSupported}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <StackPanel Grid.Row="2" Spacing="8" Margin="8">
+                        <TextBox Name="CommandArguments" IsVisible="{Binding CommandHasArguments}"
+                                 Watermark="{Binding CommandHint}" AutomationProperties.Name="ACP command arguments"
+                                 Text="{Binding CommandArguments, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock Text="{Binding CommandsStatus}" Classes="caption" TextWrapping="Wrap" />
+                        <Button Name="RunCommandButton" Content="Run command" Classes="primary small"
+                                HorizontalAlignment="Right" IsEnabled="{Binding CanRunCommand}" Click="RunCommandClick" />
+                    </StackPanel>
+                </Grid>
+            </Flyout>
+        </Button.Flyout>
+    </Button>
+</UserControl>

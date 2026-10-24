@@ -39,7 +39,7 @@ internal sealed partial class AcpChatService
             turn = _prompt;
             if (turn == null || !Current(turn) || !ReferenceEquals(connection, turn.Connection) ||
                 generation != turn.Generation || Text(parameters, "sessionId") != turn.Session ||
-                turn.Input is not { Plan: true } || _delegation != null || _agents == null ||
+                turn.Input is not { Plan: true, Command: null } || _delegation != null || _agents == null ||
                 !turn.PlanReviews.Add(id)) return cancelled;
         }
 

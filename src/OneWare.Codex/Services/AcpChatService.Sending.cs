@@ -33,6 +33,7 @@ internal sealed partial class AcpChatService
         public string? AgentEffort { get; init; }
         public bool IsAutomatic { get; init; }
         public string? CompletionNotice { get; init; }
+        public RuntimeCommand? Command { get; init; }
     }
 
     public Task SendAsync(string prompt) => SendAsync(prompt, ChatSendMode.Send);
@@ -40,6 +41,7 @@ internal sealed partial class AcpChatService
     public async Task SendAsync(string text, ChatSendMode mode)
     {
         if (string.IsNullOrWhiteSpace(text)) return;
+        var command = _delegation == null ? ParseRuntimeCommand(text) : null;
         Task? run = null;
         await _submission.WaitAsync(_lifetime.Token);
         try
@@ -50,6 +52,13 @@ internal sealed partial class AcpChatService
                 ObjectDisposedException.ThrowIf(_disposed, this);
                 if (_family.AccountChanging)
                     throw new InvalidOperationException("Wait for the ACP account operation to finish.");
+                if (command != null)
+                {
+                    if (mode != ChatSendMode.Send || _sending != 0)
+                        throw new InvalidOperationException("ACP commands run between responses. Wait or use Stop first.");
+                    if ((UnsupportedCommandReason(command.Name) ?? CommandArgumentError(command)) is { } error)
+                        throw new InvalidOperationException(error);
+                }
                 epoch = _submissionEpoch;
                 if (_sending != 0 && !_automaticTurn && mode == ChatSendMode.Send)
                     throw new InvalidOperationException("Codex ACP is working. Use Queue or Steer.");
@@ -63,13 +72,13 @@ internal sealed partial class AcpChatService
                 var agent = _agent();
                 return Task.FromResult(new Prepared(text, context,
                     agent?.TurnMode == ChatAgentTurnMode.Plan,
-                    agent?.IsReadOnly == true || agent?.TurnMode == ChatAgentTurnMode.Plan,
+                    command != null || agent?.IsReadOnly == true || agent?.TurnMode == ChatAgentTurnMode.Plan,
                     agent?.Tools?.ToArray(), agent?.Model ?? _selection.Model,
                     agent?.ReasoningEffort ?? _selection.Effort, agent?.Instructions,
                     string.Join("\n\n", _host.GetPromptAdditions()), tools, revision, plugins,
-                    Attachments.Capture(), epoch)
+                    command == null ? Attachments.Capture() : new AcpAttachments.Snapshot([], []), epoch)
                 {
-                    AgentModel = agent?.Model, AgentEffort = agent?.ReasoningEffort
+                    AgentModel = agent?.Model, AgentEffort = agent?.ReasoningEffort, Command = command
                 });
             });
 
@@ -84,7 +93,7 @@ internal sealed partial class AcpChatService
             {
                 if (epoch != _submissionEpoch || _disposed)
                     throw new InvalidOperationException("The ACP conversation changed while preparing this message.");
-                _automaticResultsPaused = false;
+                if (command == null) _automaticResultsPaused = false;
                 if (_sending != 0)
                 {
                     ValidateContent(input);
@@ -97,6 +106,7 @@ internal sealed partial class AcpChatService
                     PostOptions();
                     var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
                     _sendCancellation = cancellation;
+                    if (command != null) Emit(new ChatTurnStartedEvent());
                     run = _run = RunQueueAsync(input, cancellation);
                 }
             }
@@ -147,6 +157,8 @@ internal sealed partial class AcpChatService
 
     private object[] PromptBlocks(Prepared input, bool steer = false)
     {
+        if (input.Command is { } command)
+            return [new { type = "text", text = command.Text }];
         var text = steer
             ? "User steering request:\n" + input.Text + "\n\nOneWare context (reference data):\n" +
               JsonSerializer.Serialize(input.Context)
@@ -194,6 +206,7 @@ internal sealed partial class AcpChatService
                         var (tools, revision) = await CaptureToolsAsync();
                         input = input with { Tools = tools, ToolsRevision = revision };
                         await EnsureSessionAsync(directory, input.Tools, cancellation.Token);
+                        if (input.Command is { } command) await ValidateRuntimeCommandAsync(command, cancellation.Token);
                         ValidateContent(input);
                         await SelectAsync("mode", "read-only", cancellation.Token);
                         await SelectAsync("model", input.Model, cancellation.Token);
@@ -210,7 +223,7 @@ internal sealed partial class AcpChatService
                 cancellation.Token.ThrowIfCancellationRequested();
                 lock (_sync)
                 {
-                    input = AttachCompletedAgentsLocked(input);
+                    if (input.Command == null) input = AttachCompletedAgentsLocked(input);
                     if (input.IsAutomatic && input.CompletionNotice == null)
                     {
                         input = NextInputLocked();
@@ -218,7 +231,7 @@ internal sealed partial class AcpChatService
                         continue;
                     }
                     _automaticTurn = input.IsAutomatic;
-                    if (_delegation == null && !input.IsAutomatic)
+                    if (_delegation == null && !input.IsAutomatic && input.Command == null)
                         _continuationInput = input with
                         {
                             Content = new AcpAttachments.Snapshot([], []), CompletionNotice = null
@@ -238,6 +251,9 @@ internal sealed partial class AcpChatService
                         return Task.FromResult(true);
                     });
                     lastModel = input.Model;
+                    // Persist before dispatch: a failed/cancelled request may still have reached the agent.
+                    if (input.Command?.Name is not ("status" or "skills"))
+                        _profile.RequireSessionResume(_session!);
                     if (!input.IsAutomatic) Emit(new ChatUserMessageEvent(input.Text));
                     var reply = await turn.Connection.RequestAsync("session/prompt",
                         new { sessionId = turn.Session, prompt = PromptBlocks(input) }, turn.Cancellation.Token);
@@ -253,6 +269,8 @@ internal sealed partial class AcpChatService
                         throw new IOException("ACP prompt stopped: " + Text(reply, "stopReason"));
                     if (turn.Text.Length > 0)
                         Emit(new ChatMessageEvent(turn.Text.ToString(), turn.MessageId) { Model = input.Model });
+                    else if (input.Command is { } completed)
+                        Emit(new ChatMessageEvent("/" + completed.Name + " completed.", turn.MessageId));
                 }
                 finally
                 {
@@ -325,6 +343,8 @@ internal sealed partial class AcpChatService
                 if (turn == null || !Current(turn) || !_supportsSteering || input.Epoch != _submissionEpoch)
                     throw new InvalidOperationException("Wait for an active ACP turn with steering support.");
                 var original = turn.Input!;
+                if (original.Command != null)
+                    throw new InvalidOperationException("Wait for the ACP command to finish, or use Stop.");
                 if (input.Plan != original.Plan || input.ReadOnly != original.ReadOnly ||
                     input.AgentModel != original.AgentModel || input.AgentEffort != original.AgentEffort ||
                     input.AgentInstructions != original.AgentInstructions ||

@@ -26,6 +26,7 @@ internal sealed partial class AcpChatService
         public CancellationTokenSource Cancellation { get; } = cancellation;
         public TaskCompletionSource<bool> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public volatile bool Active = true;
+        public bool Interrupted { get; init; }
         public string? Answer { get; set; }
         public string? Error { get; set; }
         public long ToolCalls { get; set; }
@@ -146,6 +147,7 @@ internal sealed partial class AcpChatService
             lock (context.Owner._backgroundSync)
             {
                 context.Active = false;
+                context.Owner.SaveDelegation(context);
                 context.Completion.TrySetResult(true);
                 context.Cancellation.Dispose();
             }

@@ -1,10 +1,12 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:services="clr-namespace:OneWare.Codex.Services"
+             xmlns:views="clr-namespace:OneWare.Codex.Views"
              x:Class="OneWare.Codex.Views.AcpChatExtensionView"
              x:DataType="services:AcpChatService">
-    <Grid ColumnDefinitions="3*,2*" ColumnSpacing="4" MaxWidth="380" Height="22">
-        <Button Name="ModelButton" Classes="small" HorizontalContentAlignment="Stretch"
+    <Grid ColumnDefinitions="Auto,3*,2*" ColumnSpacing="4" MaxWidth="410" Height="22">
+        <views:AcpCommandsView />
+        <Button Name="ModelButton" Grid.Column="1" Classes="small" HorizontalContentAlignment="Stretch"
                 IsEnabled="{Binding CanLoadOptions}"
                 AutomationProperties.Name="ACP model" AutomationProperties.AutomationId="AcpModel"
                 ToolTip.Tip="{Binding ModelDescription}">
@@ -37,7 +39,7 @@
                 <PathIcon Grid.Column="1" Classes="muted" Data="{StaticResource Icon.ChevronDown}" Width="8" Height="8" />
             </Grid>
         </Button>
-        <Button Name="ReasoningButton" Grid.Column="1" Classes="small" HorizontalContentAlignment="Stretch"
+        <Button Name="ReasoningButton" Grid.Column="2" Classes="small" HorizontalContentAlignment="Stretch"
                 IsVisible="{Binding ShowReasoningEffort}" IsEnabled="{Binding CanEditOptions}"
                 AutomationProperties.Name="ACP reasoning" AutomationProperties.AutomationId="AcpReasoning"
                 ToolTip.Tip="{Binding ReasoningDescription}">

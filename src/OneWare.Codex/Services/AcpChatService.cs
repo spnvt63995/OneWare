@@ -40,6 +40,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
     private JsonElement _capabilities;
     private JsonElement _config;
     private string? _session;
+    private string? _conversation;
     private string? _cwd;
     private bool _loaded;
     private bool _ready;
@@ -120,7 +121,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
     }
 
     public string Name => "Codex ACP";
-    public string? CurrentSessionId => _session;
+    public string? CurrentSessionId => _conversation ?? _session;
     public string SelectionText { get; private set; } = "ACP: model selection pending";
 
     public Control? BottomUiExtension => _optionsView ??= new OneWare.Codex.Views.AcpChatExtensionView
@@ -184,9 +185,11 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
                 if (!ReferenceEquals(_connection, connection)) return;
                 _ready = false;
                 _loaded = false;
+                ResetCommandsLocked();
                 _prompt?.Cancellation.Cancel();
             }
 
+            PostOptions();
             if (!_disposed) Failure(e);
         };
         await connection.StartAsync(_profile.Executable, _profile.Directory, token);
@@ -278,13 +281,19 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         JsonElement reply;
         if (_session == null)
         {
-            reply = await _connection!.RequestAsync("session/new", new { cwd = directory, mcpServers = servers },
+            reply = await RequestSessionWithCommandsAsync("session/new", new { cwd = directory, mcpServers = servers },
                 token);
             var id = Text(reply, "sessionId") ?? throw new IOException("ACP did not return a session ID.");
             // The binding is independent of OneWare's transcript and never imports App Server sessions.
-            _profile.SaveBinding(id, directory, _selection);
+            _profile.SaveBinding(id, directory, _selection, canRecreate: true);
             _session = id;
+            _conversation = id;
             _cwd = directory;
+            if (_delegation is { } delegated)
+            {
+                lock (delegated.Owner._backgroundSync) delegated.Conversation.SessionId = id;
+                delegated.Owner.SaveDelegation(delegated);
+            }
             OnPropertyChanged(nameof(CurrentSessionId));
         }
         else
@@ -296,8 +305,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
                             load.ValueKind != JsonValueKind.True))
                 throw new IOException("This ACP agent cannot resume the existing session.");
             // No active Prompt exists during resume/load: replay cannot execute tools or append history.
-            reply = await _connection!.RequestAsync(resume ? "session/resume" : "session/load",
-                new { sessionId = _session, cwd = _cwd, mcpServers = servers }, token);
+            reply = await ResumeSessionAsync(resume ? "session/resume" : "session/load", servers, token);
             if (Text(reply, "sessionId") is { } echoed && echoed != _session)
                 throw new IOException("ACP returned a different session.");
         }
@@ -364,6 +372,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         }
         lock (_sync)
         {
+            if (ObserveCommandCatalog(connection, generation, method, parameters)) return;
             if (!_disposed && ReferenceEquals(connection, _connection) && generation == _generation &&
                 method == "session/update" && Text(parameters, "sessionId") == _session &&
                 parameters.TryGetProperty("update", out var optionUpdate) &&
@@ -574,8 +583,9 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
             _automaticResultsPaused = true;
             _queue.Clear();
             sending = _sendCancellation != null;
-            _sendCancellation?.Cancel();
             turn = _prompt;
+            // Cancellation can synchronously finish the prompt. Keep its owner for session/cancel.
+            _sendCancellation?.Cancel();
             turn?.Cancellation.Cancel();
         }
 
@@ -613,7 +623,10 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         {
             await DisconnectAsync();
             _session = null;
+            _conversation = null;
+            _sessionRecoveryNotice = null;
             _cwd = null;
+            lock (_backgroundSync) _delegationsRetiring = false;
             if (_settings != null) RestoreDefaults();
             _selection = _defaults;
             RestoreApprovalMode();
@@ -639,7 +652,9 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
             var cwd = _profile.LoadBinding(sessionId);
             await DisconnectAsync();
             ResetUsage();
-            _session = sessionId;
+            _session = _profile.LoadRuntimeSession(sessionId);
+            _conversation = sessionId;
+            _sessionRecoveryNotice = null;
             _cwd = cwd;
             _selection = _profile.LoadSelection(sessionId) ?? _defaults;
             OnPropertyChanged(nameof(CurrentSessionId));
@@ -648,6 +663,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
                 throw new InvalidOperationException(
                     "Open this ACP conversation's original workspace before resuming it.");
             await EnsureSessionAsync(cwd, await ToolsAsync(), _lifetime.Token);
+            RestoreDelegatedConversations();
             StatusChanged?.Invoke(this, new StatusEvent(true, "Codex ACP ready"));
             return true;
         }
@@ -670,6 +686,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
             _connection = null;
             _ready = false;
             _loaded = false;
+            ResetCommandsLocked();
             _prompt?.Cancellation.Cancel();
             _seenCalls.Clear();
         }

@@ -56,6 +56,7 @@ internal sealed partial class AcpChatService
         {
             if (_disposal != null) return new ValueTask(_disposal);
             if (_ownsFamily) _family.Closing = true;
+            PreserveDelegationsBeforeRetirement();
             lock (_sync) _disposed = true;
             var children = _ownsFamily ? _family.Members.Where(x => !ReferenceEquals(x, this)).ToArray() : [];
             return new ValueTask(_disposal = DisposeFamilyMemberAsync(children));

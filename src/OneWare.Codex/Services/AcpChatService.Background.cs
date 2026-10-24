@@ -21,6 +21,10 @@ internal sealed partial class AcpChatService
         run.Epoch == Interlocked.Read(ref run.Owner._conversationEpoch) &&
         run.Owner._session == run.OwnerSession;
 
+    private static string BackgroundStatus(Delegation run) => run.Active ? "running" :
+        run.Interrupted ? "interrupted" : run.Cancellation.IsCancellationRequested ? "cancelled" :
+        run.Error != null ? "failed" : "completed";
+
     private static object BackgroundSnapshot(Delegation run)
     {
         var finished = run.Completion.Task.IsCompleted;
@@ -28,8 +32,7 @@ internal sealed partial class AcpChatService
         {
             id = run.Conversation.Id,
             turn = run.Number,
-            status = !finished ? "running" : run.Cancellation.IsCancellationRequested ? "cancelled" :
-                run.Error != null ? "failed" : "completed",
+            status = BackgroundStatus(run),
             result = finished ? run.Answer : null,
             error = finished ? run.Error : null
         };
@@ -84,7 +87,8 @@ internal sealed partial class AcpChatService
         {
             var runs = owner._delegatedAgents.Values.Select(x => x.Run).Where(CanReadBackground).Select(x => new
             {
-                id = x.Conversation.Id, turn = x.Number, active = x.Active
+                id = x.Conversation.Id, name = x.Conversation.Definition.DisplayName,
+                turn = x.Number, active = x.Active, status = BackgroundStatus(x)
             }).ToArray();
             return runs.Length == 0 ? "" : "\nDelegated agents in this conversation (reference data):\n" +
                 JsonSerializer.Serialize(runs) +
@@ -105,6 +109,7 @@ internal sealed partial class AcpChatService
 
     private async Task RetireBackgroundDelegationsAsync()
     {
+        PreserveDelegationsBeforeRetirement();
         Delegation[] runs;
         lock (_backgroundSync)
         {

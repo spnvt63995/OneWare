@@ -4,7 +4,7 @@ using OneWare.Essentials.Services;
 namespace OneWare.Codex.Services;
 
 /// <summary>Runtime and authentication scoped to one OneWare app-data profile.</summary>
-internal sealed record AcpProfile(string Executable, string Model, string Effort, string Directory)
+internal sealed partial record AcpProfile(string Executable, string Model, string Effort, string Directory)
 {
     public string[] Arguments { get; init; } = [];
     public string? CodexExecutable { get; init; }
@@ -32,31 +32,79 @@ internal sealed record AcpProfile(string Executable, string Model, string Effort
         };
     }
 
-    public void SaveBinding(string id, string cwd, AcpSelection? selection = null)
+    private static readonly object BindingSync = new();
+
+    public void SaveBinding(string id, string cwd, AcpSelection? selection = null, bool canRecreate = false)
     {
-        System.IO.Directory.CreateDirectory(Bindings);
-        var file = BindingPath(id);
-        var temporary = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(new Binding("Codex ACP", id, Path.GetFullPath(cwd), selection)));
-        File.Move(temporary, file, overwrite: true);
+        lock (BindingSync)
+            WriteBinding(new Binding("Codex ACP", id, Path.GetFullPath(cwd), selection, CanRecreate: canRecreate));
     }
 
-    public string LoadBinding(string id)
+    private void WriteBinding(Binding binding)
+    {
+        System.IO.Directory.CreateDirectory(Bindings);
+        var file = BindingPath(binding.SessionId);
+        var temporary = file + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, JsonSerializer.Serialize(binding));
+            File.Move(temporary, file, overwrite: true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
+
+    private Binding ReadBinding(string id)
     {
         var binding = JsonSerializer.Deserialize<Binding>(File.ReadAllText(BindingPath(id)));
         if (binding is not { Provider: "Codex ACP" } || binding.SessionId != id ||
             !Path.IsPathFullyQualified(binding.Directory))
             throw new InvalidDataException("This session does not belong to this ACP profile.");
-        return binding.Directory;
+        return binding;
     }
 
-    public AcpSelection? LoadSelection(string id)
+    private Binding ResolveBinding(string id)
     {
-        LoadBinding(id);
-        return JsonSerializer.Deserialize<Binding>(File.ReadAllText(BindingPath(id)))?.Selection;
+        var binding = ReadBinding(id);
+        if (binding.RuntimeSessionId is not { } runtime) return binding;
+        var target = ReadBinding(runtime);
+        if (target.RuntimeSessionId != null || target.Directory != binding.Directory || runtime == id)
+            throw new InvalidDataException("Invalid ACP conversation binding.");
+        return target;
     }
 
-    public void SaveSelection(string id, AcpSelection selection) => SaveBinding(id, LoadBinding(id), selection);
+    public string LoadBinding(string id) { lock (BindingSync) return ResolveBinding(id).Directory; }
+    public string LoadRuntimeSession(string id) { lock (BindingSync) return ResolveBinding(id).SessionId; }
+    public AcpSelection? LoadSelection(string id) { lock (BindingSync) return ResolveBinding(id).Selection; }
+    public bool CanRecreateSession(string id) { lock (BindingSync) return ResolveBinding(id).CanRecreate; }
+
+    public void SaveSelection(string id, AcpSelection selection)
+    {
+        lock (BindingSync) WriteBinding(ResolveBinding(id) with { Selection = selection });
+    }
+
+    public void RequireSessionResume(string id)
+    {
+        lock (BindingSync)
+        {
+            var binding = ResolveBinding(id);
+            if (binding.CanRecreate) WriteBinding(binding with { CanRecreate = false });
+        }
+    }
+
+    public void RebindEmptySession(string conversation, string previous, string replacement)
+    {
+        lock (BindingSync)
+        {
+            var source = ReadBinding(conversation);
+            var current = ResolveBinding(conversation);
+            if (current.SessionId != previous || !current.CanRecreate ||
+                File.Exists(BindingPath(replacement)))
+                throw new InvalidDataException("The ACP conversation changed while reconnecting. Reopen it and retry.");
+            WriteBinding(current with { SessionId = replacement });
+            // Keep the OneWare history key stable, including across repeated command-only restarts.
+            WriteBinding(source with { RuntimeSessionId = replacement, CanRecreate = false });
+        }
+    }
 
     private string BindingPath(string id)
     {
@@ -66,7 +114,8 @@ internal sealed record AcpProfile(string Executable, string Model, string Effort
         return Path.Combine(Bindings, id + ".json");
     }
 
-    private sealed record Binding(string Provider, string SessionId, string Directory, AcpSelection? Selection = null);
+    private sealed record Binding(string Provider, string SessionId, string Directory, AcpSelection? Selection = null,
+        string? RuntimeSessionId = null, bool CanRecreate = false);
 }
 
 internal static class AcpRegistration

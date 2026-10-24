@@ -263,4 +263,5 @@ internal sealed class AcpRpcException(JsonElement error)
     : Exception(error.TryGetProperty("message", out var message) ? message.GetString() : "ACP request failed.")
 {
     public int Code { get; } = error.TryGetProperty("code", out var code) ? code.GetInt32() : -32603;
+    public JsonElement Details { get; } = error.TryGetProperty("data", out var data) ? data.Clone() : default;
 }
