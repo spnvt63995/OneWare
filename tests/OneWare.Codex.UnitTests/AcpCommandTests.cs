@@ -127,7 +127,7 @@ public sealed class AcpCommandTests
         await using var h = new AcpHarness();
         h.Peer.AdvertisedCommands = Catalog("status", "logout", "plan", "rename", "mcp");
         await h.Service.RefreshCommandsAsync();
-        foreach (var text in new[] { "/logout", "/plan", "/rename title", "/mcp reconnect", "/review-branch", "/status extra" })
+        foreach (var text in new[] { "/logout", "/plan", "/rename title", "/mcp login", "/mcp reconnect extra", "/review-branch", "/status extra" })
             await Assert.ThrowsAsync<InvalidOperationException>(() => h.Service.SendAsync(text));
         Advertise(h.Peer);
         await h.Service.SendAsync("/status");
@@ -137,18 +137,20 @@ public sealed class AcpCommandTests
         Assert.DoesNotContain(h.Peer.Requests, x => x.Method.StartsWith("_auth/"));
     }
 
-    [AvaloniaFact]
-    public async Task ReviewCannotInvokeWritesOrLiftThePlanRestriction()
+    [AvaloniaTheory]
+    [InlineData("/review")]
+    [InlineData("/mcp reconnect")]
+    public async Task CommandsCannotInvokeWritesOrLiftThePlanRestriction(string command)
     {
         await using var h = new AcpHarness();
         h.Agent = new ChatAgentDefinition { Id = "plan", DisplayName = "Plan", TurnMode = ChatAgentTurnMode.Plan };
-        h.Peer.AdvertisedCommands = Catalog("review");
+        h.Peer.AdvertisedCommands = Catalog("review", "mcp");
         h.Provider.RegisterFunction(new OneWareAiFunction
         {
             Name = "acp_fixture", Description = "Writable fixture", IsReadOnly = false,
             Handler = (Func<string, string>)(value => "wrote " + value)
         });
-        var send = h.Service.SendAsync("/review");
+        var send = h.Service.SendAsync(command);
         await h.Peer.PromptStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         Assert.True((await h.Peer.CallTool("write", "acp_fixture", new { value = "value" })).GetProperty("isError").GetBoolean());
         var permission = await h.Peer.ServerRequest!("session/request_permission", AcpPeer.Json(new
@@ -168,12 +170,14 @@ public sealed class AcpCommandTests
         await send;
     }
 
-    [AvaloniaFact]
-    public async Task StopCancelsTheCommandAndRejectsLateOutputAndCatalogUpdates()
+    [AvaloniaTheory]
+    [InlineData("/compact")]
+    [InlineData("/mcp reconnect")]
+    public async Task StopCancelsTheCommandAndRejectsLateOutputAndCatalogUpdates(string command)
     {
         await using var h = new AcpHarness();
-        h.Peer.AdvertisedCommands = Catalog("compact");
-        var send = h.Service.SendAsync("/compact");
+        h.Peer.AdvertisedCommands = Catalog("compact", "mcp");
+        var send = h.Service.SendAsync(command);
         await h.Peer.PromptStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         await h.Service.AbortAsync();
         await send;

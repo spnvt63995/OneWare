@@ -8,7 +8,8 @@ namespace OneWare.Codex.UnitTests;
 
 public sealed class AcpCommandRecoveryTests
 {
-    private static object[] Commands => [new { name = "status", description = "Session status" }];
+    private static object[] Commands =>
+        [new { name = "status", description = "Session status" }, new { name = "mcp", description = "MCP servers" }];
 
     private static AcpRpcException Missing(string id, bool raw = false) => new(AcpPeer.Json(raw
         ? (object)new { code = -32603, message = "Internal error", data = new { details = "no rollout found for thread id " + id } }
@@ -21,22 +22,24 @@ public sealed class AcpCommandRecoveryTests
         return service;
     }
 
-    private static async Task Status(AcpChatService service, AcpPeer peer)
+    private static async Task Status(AcpChatService service, AcpPeer peer, string command = "/status")
     {
-        var send = service.SendAsync("/status");
+        var send = service.SendAsync(command);
         await peer.PromptStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         peer.Complete();
         await send;
     }
 
     [AvaloniaTheory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task CommandOnlyRestartsKeepTheHistoryKeyAndSelectionWithoutReplayingPrompts(bool rawError)
+    [InlineData(false, "/status")]
+    [InlineData(true, "/status")]
+    [InlineData(false, "/mcp")]
+    [InlineData(true, "/mcp reconnect")]
+    public async Task CommandOnlyRestartsKeepTheHistoryKeyAndSelectionWithoutReplayingPrompts(bool rawError, string command)
     {
         await using var h = new AcpHarness();
         h.Peer.AdvertisedCommands = Commands;
-        await Status(h.Service, h.Peer);
+        await Status(h.Service, h.Peer, command);
         var id = h.Service.CurrentSessionId!;
         var selection = h.Profile.LoadSelection(id);
         await h.Service.DisposeAsync();
@@ -164,7 +167,7 @@ public sealed class AcpCommandRecoveryTests
         await reopened.RefreshCommandsAsync();
         Assert.Equal(peer.Id, h.Profile.LoadRuntimeSession(id));
         Assert.Equal(id, reopened.CurrentSessionId);
-        Assert.Single(reopened.Commands);
+        Assert.Equal(2, reopened.Commands.Count);
         Assert.Empty(peer.Prompts);
         Assert.Contains("Reconnected", reopened.CommandsStatus);
     }

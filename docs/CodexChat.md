@@ -18,16 +18,23 @@ during a turn follow the provider's synchronization and ownership rules.
 
 Use the **/** button next to the model picker to search the current session's commands, read their
 descriptions and enter arguments. You can also type a command directly in the chat input.
-Supported commands are `/status`, `/skills`, `/compact`, `/review`, `/review-branch <branch>` and
+Supported commands are `/status`, `/skills`, `/mcp`, `/mcp reconnect`, `/compact`, `/review`, `/review-branch <branch>` and
 `/review-commit <commit>`, when advertised by the runtime. Commands run between responses and use
 the existing Stop button. Attachments remain in the draft for the next ordinary message.
+Use `/mcp` to inspect server status and `/mcp reconnect` to reload MCP connections across the runtime's
+open sessions. The response reports connected, starting, disabled, failed or authentication-required
+servers as provided by the runtime. Servers may still be starting after a reconnect; query their status
+again instead of assuming success. OneWare does not open MCP sign-in pages, and the runtime reports
+when a server needs authentication that this client cannot complete.
+
 Review commands keep workspace operations read-only. Use the existing OneWare controls for Plan,
 account sign-out and conversation renaming; commands that need additional integration show a reason
 in the picker instead of changing those states independently.
 
 The runtime may not persist a new session until it receives an ordinary message. OneWare records
-whether a conversation has only used `/status` or `/skills`, and can reconnect such a conversation
-after restarting while keeping its saved chat entry and model selection. Once any other prompt is
+whether a conversation has only used `/status`, `/skills` or `/mcp` (including `reconnect`), and can
+reconnect such a conversation after restarting while keeping its saved chat entry and model selection.
+Restoring a conversation never reruns its commands, including reconnect. Once any other prompt is
 dispatched, including a review or compaction, it requires the original session to resume. Missing
 sessions with prior work or older bindings without this information show recovery guidance and are
 never silently replaced.

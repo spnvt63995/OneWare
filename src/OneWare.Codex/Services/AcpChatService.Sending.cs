@@ -256,8 +256,9 @@ internal sealed partial class AcpChatService
                         return Task.FromResult(true);
                     });
                     lastModel = input.Model;
-                    // Persist before dispatch: a failed/cancelled request may still have reached the agent.
-                    if (input.Command?.Name is not ("status" or "skills"))
+                    // These runtime commands do not create a Codex turn, including MCP reconnect.
+                    // All other requests must resume even if dispatch fails or is cancelled.
+                    if (input.Command?.Name is not ("status" or "skills" or "mcp"))
                         _profile.RequireSessionResume(_session!);
                     if (!input.IsAutomatic) Emit(new ChatUserMessageEvent(input.Text));
                     var reply = await turn.Connection.RequestAsync("session/prompt",
@@ -275,7 +276,9 @@ internal sealed partial class AcpChatService
                     if (turn.Text.Length > 0)
                         Emit(new ChatMessageEvent(turn.Text.ToString(), turn.MessageId) { Model = input.Model });
                     else if (input.Command is { } completed)
-                        Emit(new ChatMessageEvent("/" + completed.Name + " completed.", turn.MessageId));
+                        Emit(new ChatMessageEvent(completed.Name == "mcp"
+                            ? "The MCP command returned no status. Run /mcp to check the servers."
+                            : "/" + completed.Name + " completed.", turn.MessageId));
                     planState = ChatPlanRunState.Finished;
                 }
                 catch (OperationCanceledException)

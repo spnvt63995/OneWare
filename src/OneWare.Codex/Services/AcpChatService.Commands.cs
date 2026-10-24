@@ -36,7 +36,7 @@ internal sealed partial class AcpChatService
         SelectedCommand is { IsSupported: true } selected &&
         CommandArgumentError(new RuntimeCommand(selected.Name, CommandArguments.Trim())) == null;
     public string CommandHint => SelectedCommand?.Hint ?? "No arguments";
-    public bool CommandHasArguments => SelectedCommand?.Name is "review" or "review-branch" or "review-commit";
+    public bool CommandHasArguments => SelectedCommand?.Name is "mcp" or "review" or "review-branch" or "review-commit";
     public string CommandsStatus => _loadingCommands ? "Loading commands…" : _commandsError ??
         (_sending != 0 ? "Wait for the current response to finish, or use Stop." :
             SelectedCommand?.UnavailableReason ??
@@ -44,7 +44,9 @@ internal sealed partial class AcpChatService
                 ? CommandArgumentError(new RuntimeCommand(selected.Name, CommandArguments.Trim()))
                 : null) ??
             (_commands.Length == 0 ? "No commands advertised by this session." :
-                _sessionRecoveryNotice ?? "Attachments stay in your draft."));
+                _sessionRecoveryNotice ?? (SelectedCommand?.Name == "mcp"
+                    ? "Leave arguments empty to show status. Use reconnect to reload MCP servers in all open sessions."
+                    : "Attachments stay in your draft.")));
 
     public string CommandSearchText
     {
@@ -116,7 +118,7 @@ internal sealed partial class AcpChatService
 
     private static string? UnsupportedCommandReason(string name) => name switch
     {
-        "status" or "skills" or "compact" or "review" or "review-branch" or "review-commit" => null,
+        "status" or "skills" or "mcp" or "compact" or "review" or "review-branch" or "review-commit" => null,
         "plan" => "Use OneWare's Agent / Plan selector to change mode.",
         "logout" => "Use the account menu to sign out of all related conversations.",
         "rename" => "Use OneWare's conversation menu to rename this chat.",
@@ -127,6 +129,9 @@ internal sealed partial class AcpChatService
     {
         "status" or "skills" or "compact" when command.Arguments.Length != 0 =>
             command.Text.Split(' ')[0] + " does not take arguments.",
+        "mcp" when command.Arguments.Length != 0 &&
+                   !command.Arguments.Equals("reconnect", StringComparison.OrdinalIgnoreCase) =>
+            "Use /mcp to show server status, or /mcp reconnect to reconnect servers.",
         "review-branch" when command.Arguments.Length == 0 => "Enter the base branch to review against.",
         "review-commit" when command.Arguments.Length == 0 => "Enter the commit to review.",
         _ => null
