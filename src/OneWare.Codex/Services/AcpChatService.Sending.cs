@@ -239,7 +239,12 @@ internal sealed partial class AcpChatService
                 }
                 var turn = new Prompt(_connection!, _generation, _session!, directory, input.ReadOnly,
                     input.Allowed, input.Tools, input.Model, input.ToolsRevision, cancellation.Token) { Input = input };
-                lock (_sync) _prompt = turn;
+                lock (_sync)
+                {
+                    _prompt = turn;
+                    PublishExecutionPlan(turn);
+                }
+                var planState = ChatPlanRunState.Failed;
                 try
                 {
                     await OneWareHost.Ui(() =>
@@ -271,12 +276,19 @@ internal sealed partial class AcpChatService
                         Emit(new ChatMessageEvent(turn.Text.ToString(), turn.MessageId) { Model = input.Model });
                     else if (input.Command is { } completed)
                         Emit(new ChatMessageEvent("/" + completed.Name + " completed.", turn.MessageId));
+                    planState = ChatPlanRunState.Finished;
+                }
+                catch (OperationCanceledException)
+                {
+                    planState = ChatPlanRunState.Stopped;
+                    throw;
                 }
                 finally
                 {
                     lock (_sync)
                     {
                         turn.Finished = true;
+                        PublishExecutionPlan(turn, planState);
                         turn.Cancellation.Cancel();
                         if (ReferenceEquals(_prompt, turn)) _prompt = null;
                     }

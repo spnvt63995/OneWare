@@ -96,7 +96,9 @@ internal sealed partial class AcpChatService
                         turn.ReadOnly = false;
                         turn.Input = turn.Input! with
                         {
-                            Plan = false, ReadOnly = false, AgentInstructions = _agents.SelectedAgent?.Instructions
+                            Plan = false, ReadOnly = false, AgentInstructions = _agents.SelectedAgent?.Instructions,
+                            AgentModel = _agents.SelectedAgent?.Model,
+                            AgentEffort = _agents.SelectedAgent?.ReasoningEffort
                         };
                         SelectionText = $"Codex ACP · {turn.Input.Model} · {turn.Input.Effort}";
                         OnPropertyChanged(nameof(SelectionText));

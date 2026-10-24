@@ -38,6 +38,12 @@ results are delivered to the parent conversation. Expand a child agent's tool ca
 progress and result, including runtime-provided failure details. Long results are shortened for display;
 image, diff and terminal references are not rendered as text results.
 
+When the parent agent reports an execution plan, a collapsible list above the input shows pending,
+in-progress and completed steps. Each update replaces the list. Stop, errors and turn completion keep
+the last reported steps without marking unfinished work complete. A new run or conversation clears
+the list; execution plans are not saved in chat history. This display is separate from the Plan-mode
+decision to start implementation or update the proposed plan.
+
 The managed ACP runtime still uses Codex CLI internally. Its internal App Server process is required
 by that runtime; it is separate from the retired direct App Server provider.
 

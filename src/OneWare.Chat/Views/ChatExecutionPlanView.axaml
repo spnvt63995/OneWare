@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:OneWare.Chat.ViewModels"
+             x:Class="OneWare.Chat.Views.ChatExecutionPlanView"
+             x:DataType="vm:ChatExecutionPlanViewModel"
+             IsVisible="{Binding HasEntries, FallbackValue=False}">
+    <Expander IsExpanded="{Binding IsExpanded}">
+        <Expander.Header>
+            <StackPanel Spacing="{DynamicResource ThemeSpacingXSmall}">
+                <TextBlock Classes="semibold" Text="Execution plan" />
+                <TextBlock Classes="caption" Text="{Binding Summary}" />
+            </StackPanel>
+        </Expander.Header>
+        <ScrollViewer MaxHeight="180" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Entries}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChatPlanStepViewModel">
+                        <Grid ColumnDefinitions="*, Auto" ColumnSpacing="{DynamicResource ThemeSpacing}"
+                              Margin="0 4" ToolTip.Tip="{Binding Priority}">
+                            <SelectableTextBlock Text="{Binding Content}" TextWrapping="Wrap" />
+                            <TextBlock Grid.Column="1" Classes="caption" Classes.success="{Binding IsCompleted}"
+                                       Classes.accent="{Binding IsInProgress}" Text="{Binding StatusText}" />
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Expander>
+</UserControl>

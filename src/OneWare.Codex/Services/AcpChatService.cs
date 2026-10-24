@@ -80,6 +80,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         public HashSet<string> Claimed { get; } = [];
         public Dictionary<string, AcpRuntimeToolCall> BackendCalls { get; } = [];
         public HashSet<string> PlanReviews { get; } = [];
+        public IReadOnlyList<ChatPlanStep> PlanEntries { get; set; } = [];
         public HashSet<string> TransportApprovals { get; } = [];
         public StringBuilder Text { get; } = new();
         public string MessageId { get; set; } = Guid.NewGuid().ToString("N");
@@ -391,13 +392,16 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
             var kind = Text(update, "sessionUpdate");
             // Wait for real turn output before permitting config writes: the runtime
             // captures its model asynchronously when a prompt starts.
-            if (!turn.Started && kind is "agent_message_chunk" or "agent_thought_chunk" or "tool_call")
+            if (!turn.Started && kind is "agent_message_chunk" or "agent_thought_chunk" or "tool_call" or "plan")
             {
                 turn.Started = true;
                 PostOptions();
             }
             switch (kind)
             {
+                case "plan":
+                    ObserveExecutionPlan(turn, update);
+                    break;
                 case "usage_update":
                     ObserveContextUsage(update);
                     break;

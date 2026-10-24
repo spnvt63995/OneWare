@@ -428,6 +428,15 @@ public partial class ChatSessionViewModel : ObservableObject
 
     public ObservableCollection<IChatMessage> Messages { get; set; } = new();
 
+    public ChatExecutionPlanViewModel ExecutionPlan { get; } = new();
+    private long _planGeneration;
+
+    private void ClearExecutionPlan()
+    {
+        Interlocked.Increment(ref _planGeneration);
+        ExecutionPlan.Clear();
+    }
+
     /// <summary>
     /// Messages the user has queued while the agent is busy. Rendered (dimmed) below the
     /// conversation until the agent activates them.
@@ -550,6 +559,7 @@ public partial class ChatSessionViewModel : ObservableObject
             return false;
         }
 
+        ClearExecutionPlan();
         Messages.Clear();
         _assistantMessagesById.Clear();
         _turnAssistantMessages.Clear();
@@ -580,6 +590,7 @@ public partial class ChatSessionViewModel : ObservableObject
         Title = DefaultTitle;
         _host.OnSessionChanged(this);
 
+        ClearExecutionPlan();
         Messages.Clear();
         QueuedMessages.Clear();
         _pendingLocalMessages.Clear();
@@ -1054,6 +1065,17 @@ public partial class ChatSessionViewModel : ObservableObject
     {
         switch (e)
         {
+            case ChatExecutionPlanEvent { AgentId: null } x:
+            {
+                var generation = Interlocked.Read(ref _planGeneration);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (generation == Interlocked.Read(ref _planGeneration) && ReferenceEquals(Service, sender) &&
+                        CurrentSessionId == x.SessionId)
+                        ExecutionPlan.Update(x);
+                });
+                break;
+            }
             case ChatTurnStartedEvent { AgentId: null }:
             {
                 Dispatcher.UIThread.Post(() =>
@@ -1329,6 +1351,7 @@ public partial class ChatSessionViewModel : ObservableObject
     {
         Dispatcher.UIThread.Post(() =>
         {
+            ClearExecutionPlan();
             // Keep the visible transcript: a session reset (e.g. after a CLI update or
             // re-login) starts a fresh backend session, but wiping the conversation from
             // the view is unnecessary. Only in-flight state tied to the old session is
@@ -1662,6 +1685,7 @@ public partial class ChatSessionViewModel : ObservableObject
 
     internal void LoadMessagesFromStates(IReadOnlyCollection<ChatMessageState> states)
     {
+        ClearExecutionPlan();
         Messages.Clear();
         _assistantMessagesById.Clear();
         _turnAssistantMessages.Clear();
@@ -1679,6 +1703,7 @@ public partial class ChatSessionViewModel : ObservableObject
     /// <summary>Drops the visible conversation, e.g. because the stored history of the service was discarded.</summary>
     internal void ClearTranscript()
     {
+        ClearExecutionPlan();
         Messages.Clear();
         _notConnectedMessage = null;
         _assistantMessagesById.Clear();
@@ -1697,6 +1722,7 @@ public partial class ChatSessionViewModel : ObservableObject
     /// <summary>Stops listening to the service when the chat is unloaded.</summary>
     internal void Detach()
     {
+        ClearExecutionPlan();
         Service.EventReceived -= OnEventReceived;
         Service.StatusChanged -= OnStatusChanged;
         Service.SessionReset -= OnSessionReset;

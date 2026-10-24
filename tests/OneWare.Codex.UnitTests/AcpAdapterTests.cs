@@ -553,6 +553,8 @@ internal sealed class AcpPeer : IAgentConnection
 
     public void CompleteSilently() => _response.TrySetResult(Json(new { stopReason = "end_turn" }));
 
+    public void FailResponse(Exception error) => _response.TrySetException(error);
+
     public void Drop()
     {
         IsConnected = false;

@@ -94,6 +94,7 @@
                              outside the scrolling region so the virtualizing message list above can virtualize
                              against the viewport (it must be the direct content of the ScrollViewer). -->
                         <StackPanel DockPanel.Dock="Bottom" Margin="10 6 0 0" Spacing="5">
+                            <views:ChatExecutionPlanView DataContext="{Binding ExecutionPlan}" Margin="0 0 10 0" />
                             <!-- Activity indicator: agent working, or a send waiting for the service to connect -->
                             <Grid ColumnDefinitions="Auto, Auto" ColumnSpacing="6"
                                   IsVisible="{Binding IsActivityVisible}">
