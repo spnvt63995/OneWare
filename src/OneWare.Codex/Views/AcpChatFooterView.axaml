@@ -1,0 +1,91 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:OneWare.Codex.Services"
+             xmlns:controls="clr-namespace:OneWare.Essentials.Controls;assembly=OneWare.Essentials"
+             x:Class="OneWare.Codex.Views.AcpChatFooterView"
+             x:DataType="services:AcpChatService">
+    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+        <Button Name="ModeButton" Classes="small" MaxWidth="126" VerticalAlignment="Center"
+                IsEnabled="{Binding CanChangeApprovalMode}" ToolTip.Tip="{Binding ApprovalModeDescription}"
+                AutomationProperties.Name="ACP approval mode" AutomationProperties.AutomationId="AcpApprovalMode">
+            <Button.Flyout>
+                <Flyout FlyoutPresenterClasses="flush" Placement="TopEdgeAlignedLeft">
+                    <ListBox Name="ModeList" Classes="transparent" BorderThickness="0" MinWidth="170"
+                             ItemsSource="{Binding ApprovalModes}"
+                             SelectedItem="{Binding SelectedApprovalMode, Mode=TwoWay}"
+                             PointerReleased="ModePointerReleased">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" /></DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Flyout>
+            </Button.Flyout>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                <TextBlock Classes="caption" Text="{Binding SelectedApprovalMode}" TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
+                <PathIcon Grid.Column="1" Classes="muted" Data="{StaticResource Icon.ChevronDown}" Width="8" Height="8" />
+            </Grid>
+        </Button>
+        <Button Name="UsageButton" Classes="small" VerticalAlignment="Center" IsVisible="{Binding HasUsageData}"
+                ToolTip.Tip="Token usage and context window"
+                AutomationProperties.Name="ACP usage" AutomationProperties.AutomationId="AcpUsage">
+            <Button.Flyout>
+                <Flyout Placement="TopEdgeAlignedRight">
+                    <StackPanel Spacing="10" MinWidth="230">
+                        <StackPanel Spacing="3" IsVisible="{Binding HasTurnUsage}">
+                            <TextBlock Classes="overline" Text="Last Turn" />
+                            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                <TextBlock Classes="caption" Text="↑ Input" />
+                                <TextBlock Name="InputTokens" Grid.Column="2" Classes="caption"
+                                           Text="{Binding LastInputTokens, StringFormat='{}{0:N0} tokens'}" />
+                                <TextBlock Grid.Row="1" Classes="caption" Text="↓ Output" />
+                                <TextBlock Grid.Row="1" Grid.Column="2" Classes="caption"
+                                           Text="{Binding LastOutputTokens, StringFormat='{}{0:N0} tokens'}" />
+                                <TextBlock Grid.Row="2" Classes="caption" Text="⟳ Reasoning"
+                                           IsVisible="{Binding HasReasoningUsage}" />
+                                <TextBlock Grid.Row="2" Grid.Column="2" Classes="caption"
+                                           IsVisible="{Binding HasReasoningUsage}"
+                                           Text="{Binding LastReasoningTokens, StringFormat='{}{0:N0} tokens'}" />
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel Spacing="3" IsVisible="{Binding HasSessionUsage}"
+                                    ToolTip.Tip="Reported usage since opening this conversation">
+                            <Separator IsVisible="{Binding HasTurnUsage}" />
+                            <TextBlock Classes="overline" Text="Session Totals" />
+                            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                <TextBlock Classes="caption" Text="Turns" />
+                                <TextBlock Grid.Column="2" Classes="caption" Text="{Binding SessionTotalTurns, StringFormat='{}{0:N0}'}" />
+                                <TextBlock Grid.Row="1" Classes="caption" Text="↑ Total input" />
+                                <TextBlock Grid.Row="1" Grid.Column="2" Classes="caption"
+                                           Text="{Binding SessionTotalInputTokens, StringFormat='{}{0:N0} tokens'}" />
+                                <TextBlock Grid.Row="2" Classes="caption" Text="↓ Total output" />
+                                <TextBlock Grid.Row="2" Grid.Column="2" Classes="caption"
+                                           Text="{Binding SessionTotalOutputTokens, StringFormat='{}{0:N0} tokens'}" />
+                            </Grid>
+                        </StackPanel>
+                        <StackPanel Spacing="3" IsVisible="{Binding HasContextUsage}">
+                            <Separator IsVisible="{Binding HasSessionUsage}" />
+                            <TextBlock Classes="overline" Text="Context Window" />
+                            <ProgressBar Minimum="0" Maximum="{Binding ContextTokenLimit}" Value="{Binding ContextCurrentTokens}" />
+                            <TextBlock Name="ContextTokens" Classes="caption" HorizontalAlignment="Right">
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="{}{0:N0} / {1:N0}">
+                                        <Binding Path="ContextCurrentTokens" /><Binding Path="ContextTokenLimit" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+                </Flyout>
+            </Button.Flyout>
+            <Panel Width="20" Height="20">
+                <controls:CircularProgressBar Value="{Binding ContextCurrentTokens}" Maximum="{Binding ContextTokenLimit}"
+                    StrokeThickness="2.5" TrackBrush="{DynamicResource ThemeBorderMidBrush}"
+                    ProgressBrush="{DynamicResource ThemeAccentBrush}" Width="14" Height="14"
+                    IsVisible="{Binding HasContextUsage}" />
+                <Ellipse Width="6" Height="6" Fill="{DynamicResource ThemeForegroundLowBrush}"
+                         IsVisible="{Binding !HasContextUsage}" />
+            </Panel>
+        </Button>
+    </StackPanel>
+</UserControl>

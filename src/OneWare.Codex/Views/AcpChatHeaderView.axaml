@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:OneWare.Codex.Services"
+             x:Class="OneWare.Codex.Views.AcpChatHeaderView"
+             x:DataType="services:AcpChatService">
+    <Button Name="OverflowButton" VerticalAlignment="Center" ToolTip.Tip="More">
+        <Button.Flyout>
+            <Flyout Placement="BottomEdgeAlignedRight">
+                <StackPanel MinWidth="220" MaxWidth="320" Spacing="8">
+                    <StackPanel Spacing="1">
+                        <TextBlock Text="{Binding AccountStatusText}" Classes="caption semibold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding AccountDetailsText}" Classes="caption muted" TextWrapping="Wrap"
+                                   IsVisible="{Binding HasAccountDetails}" />
+                    </StackPanel>
+                    <TextBlock Text="This login is provided outside of OneWare and cannot be removed here."
+                               Classes="caption muted" TextWrapping="Wrap" IsVisible="{Binding IsExternalAccount}" />
+                    <Button Content="Sign in with ChatGPT" Classes="small"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            IsVisible="{Binding CanSignIn}" Command="{Binding SignInCommand}" />
+                    <Button Content="Sign out" Classes="small"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                            IsVisible="{Binding CanSignOut}" Command="{Binding SignOutCommand}" />
+                    <Button Content="Cancel sign-in" Classes="small" IsVisible="{Binding IsSigningIn}"
+                            Command="{Binding CancelSignInCommand}" />
+                    <Button Content="Refresh" Classes="small" Command="{Binding RefreshAccountCommand}"
+                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                    <TextBlock Text="{Binding AccountMessage}" Classes="caption muted" TextWrapping="Wrap"
+                               IsVisible="{Binding HasAccountMessage}" />
+                </StackPanel>
+            </Flyout>
+        </Button.Flyout>
+        <Image Source="{DynamicResource BoxIcons.RegularDotsVerticalRounded}" Width="12" Height="12" />
+    </Button>
+</UserControl>

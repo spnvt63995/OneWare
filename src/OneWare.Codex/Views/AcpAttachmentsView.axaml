@@ -1,0 +1,45 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:OneWare.Codex.Services"
+             xmlns:vm="clr-namespace:OneWare.Codex.ViewModels"
+             x:Class="OneWare.Codex.Views.AcpAttachmentsView"
+             x:DataType="services:AcpAttachments">
+    <StackPanel Spacing="4">
+        <WrapPanel>
+            <Button Name="AttachButton" Classes="ghost" Content="Attach files"
+                    Command="{Binding AddCommand}" CommandParameter="{Binding #AttachButton}" />
+            <ContentControl Content="{Binding ActiveFile}">
+                <ContentControl.ContentTemplate>
+                    <DataTemplate x:DataType="vm:ChatAttachmentViewModel">
+                        <ToggleButton IsChecked="{Binding IsIncluded, Mode=OneWay}"
+                                      Command="{Binding ToggleIncludedCommand}" ToolTip.Tip="{Binding FilePath}">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="{Binding DisplayName}" Classes="caption" />
+                                <TextBlock Text="{Binding Detail}" Classes="caption" />
+                            </StackPanel>
+                        </ToggleButton>
+                    </DataTemplate>
+                </ContentControl.ContentTemplate>
+            </ContentControl>
+        </WrapPanel>
+        <ItemsControl ItemsSource="{Binding Items}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel />
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ChatAttachmentViewModel">
+                    <StackPanel Orientation="Horizontal" Spacing="4" Margin="0 0 8 4">
+                        <Image Source="{Binding ThumbnailBitmap}" IsVisible="{Binding IsImage}" Width="20" Height="20" />
+                        <TextBlock Text="{Binding DisplayName}" Classes="caption" VerticalAlignment="Center"
+                                   ToolTip.Tip="{Binding FilePath}" />
+                        <Button Classes="icon" Command="{Binding RemoveCommand}" ToolTip.Tip="Remove attachment">
+                            <PathIcon Classes="small" Data="{StaticResource Icon.Close}" />
+                        </Button>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

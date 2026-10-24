@@ -235,6 +235,12 @@ public sealed class ChatPlanReadyEvent(
     public bool IsExpired { get; private set; }
 }
 
+/// <summary>
+/// A service started a parent turn without a user submission. The existing busy/Stop UI
+/// remains active until <see cref="ChatIdleEvent"/>; no user message is added.
+/// </summary>
+public sealed class ChatTurnStartedEvent() : ChatEvent();
+
 public sealed class ChatIdleEvent()
     : ChatEvent()
 {

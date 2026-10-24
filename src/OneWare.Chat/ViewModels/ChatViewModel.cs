@@ -256,7 +256,8 @@ public class ChatViewModel : ExtendedTool, IChatManagerService, IChatSessionHost
 
     public void RegisterChatService(IChatService chatService)
     {
-        ChatServices.Add(chatService);
+        if (chatService is IChatServiceWithDefaultPreference) ChatServices.Insert(0, chatService);
+        else ChatServices.Add(chatService);
 
         if (chatService is IChatServiceWithHistoryReset historyReset)
             historyReset.HistoryCleared += OnServiceHistoryCleared;

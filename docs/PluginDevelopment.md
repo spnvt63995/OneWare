@@ -375,6 +375,9 @@ Provides all app path locations: `AppDataDirectory`, `ProjectsDirectory`, `Packa
 #### `IChatManagerService` (src/OneWare.Essentials/Services/IChatManagerService.cs)
 
 - `RegisterChatService(IChatService)`: add a chat provider.
+- `IChatServiceWithDefaultPreference`: an optional marker that puts a provider first for fresh profiles
+  or when the saved provider is no longer installed. A saved choice of an installed provider still wins.
+  Codex ACP implements this marker; plugins do not need to change existing registrations.
 - `SelectedChatService`: provider of the shown chat. Setting it opens a new chat with that provider (a working
   chat keeps running in the background).
 - `SaveState()`: persist the loaded chats and which chat was shown last.

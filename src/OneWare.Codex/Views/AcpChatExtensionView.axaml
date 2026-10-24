@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:OneWare.Codex.Services"
+             x:Class="OneWare.Codex.Views.AcpChatExtensionView"
+             x:DataType="services:AcpChatService">
+    <Grid ColumnDefinitions="3*,2*" ColumnSpacing="4" MaxWidth="380" Height="22">
+        <Button Name="ModelButton" Classes="small" HorizontalContentAlignment="Stretch"
+                IsEnabled="{Binding CanLoadOptions}"
+                AutomationProperties.Name="ACP model" AutomationProperties.AutomationId="AcpModel"
+                ToolTip.Tip="{Binding ModelDescription}">
+            <Button.Flyout>
+                <Flyout FlyoutPresenterClasses="flush" Placement="TopEdgeAlignedRight">
+                    <DockPanel Width="280" MaxHeight="360">
+                        <TextBox Name="ModelSearch" DockPanel.Dock="Top" Classes="search"
+                                 Watermark="Search models..." AutomationProperties.Name="Search ACP models"
+                                 Text="{Binding ModelSearchText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBlock DockPanel.Dock="Bottom" Classes="caption" Margin="8"
+                                   Text="{Binding OptionsStatus}" IsVisible="{Binding HasOptionsStatus}"
+                                   TextWrapping="Wrap" />
+                        <ListBox Name="ModelList" Classes="transparent" BorderThickness="0"
+                                 ItemsSource="{Binding FilteredModels}"
+                                 SelectedItem="{Binding SelectedModelChoice, Mode=OneWay}"
+                                 IsEnabled="{Binding CanEditOptions}" SelectionChanged="ModelSelectionChanged"
+                                 PointerReleased="ModelPointerReleased">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="services:AcpOptionChoice">
+                                    <TextBlock Text="{Binding Label}" ToolTip.Tip="{Binding Description}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Flyout>
+            </Button.Flyout>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                <TextBlock Classes="caption" Text="{Binding ModelLabel}" TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
+                <PathIcon Grid.Column="1" Classes="muted" Data="{StaticResource Icon.ChevronDown}" Width="8" Height="8" />
+            </Grid>
+        </Button>
+        <Button Name="ReasoningButton" Grid.Column="1" Classes="small" HorizontalContentAlignment="Stretch"
+                IsVisible="{Binding ShowReasoningEffort}" IsEnabled="{Binding CanEditOptions}"
+                AutomationProperties.Name="ACP reasoning" AutomationProperties.AutomationId="AcpReasoning"
+                ToolTip.Tip="{Binding ReasoningDescription}">
+            <Button.Flyout>
+                <Flyout FlyoutPresenterClasses="flush" Placement="TopEdgeAlignedRight">
+                    <DockPanel Width="220" MaxHeight="360">
+                        <TextBlock DockPanel.Dock="Bottom" Classes="caption" Margin="8"
+                                   Text="{Binding OptionsStatus}" IsVisible="{Binding HasOptionsStatus}"
+                                   TextWrapping="Wrap" />
+                        <ListBox Name="ReasoningList" Classes="transparent" BorderThickness="0"
+                                 ItemsSource="{Binding ReasoningEfforts}"
+                                 SelectedItem="{Binding SelectedReasoningEffort, Mode=OneWay}"
+                                 IsEnabled="{Binding CanEditReasoning}" SelectionChanged="ReasoningSelectionChanged"
+                                 PointerReleased="ReasoningPointerReleased">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="services:AcpOptionChoice">
+                                    <TextBlock Text="{Binding Label}" ToolTip.Tip="{Binding Description}" />
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </DockPanel>
+                </Flyout>
+            </Button.Flyout>
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="5">
+                <TextBlock Classes="caption" Text="{Binding ReasoningLabel}" TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center" />
+                <PathIcon Grid.Column="1" Classes="muted" Data="{StaticResource Icon.ChevronDown}" Width="8" Height="8" />
+            </Grid>
+        </Button>
+    </Grid>
+</UserControl>

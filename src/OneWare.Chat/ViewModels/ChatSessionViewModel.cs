@@ -1054,6 +1054,14 @@ public partial class ChatSessionViewModel : ObservableObject
     {
         switch (e)
         {
+            case ChatTurnStartedEvent { AgentId: null }:
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (ReferenceEquals(Service, sender)) IsBusy = true;
+                });
+                break;
+            }
             case ChatMessageDeltaEvent x:
             {
                 if (string.IsNullOrWhiteSpace(x.Content)) break;

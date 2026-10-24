@@ -1,0 +1,99 @@
+using Xunit;
+using static OneWare.Codex.AdapterContractTests.CallContractTests;
+
+namespace OneWare.Codex.AdapterContractTests;
+
+public sealed class ApprovalContractTests
+{
+    [Theory]
+    [InlineData("completed", "once")]
+    [InlineData("completed", "chat")]
+    [InlineData("cancelled", "once")]
+    [InlineData("cancelled", "chat")]
+    [InlineData("new-prompt", "once")]
+    [InlineData("new-prompt", "chat")]
+    [InlineData("new-session", "once")]
+    [InlineData("new-session", "chat")]
+    [InlineData("new-connection", "once")]
+    [InlineData("new-connection", "chat")]
+    [Trait("Contract", "F05")]
+    public void F05_LateButtonAfterScopeEndsCannotExecuteOrGrant(string transition, string answer)
+    {
+        var fixture = Fixture(approval: true);
+        fixture.Notice(Call());
+        var receipt = fixture.Request("rpc-a", Call());
+        var decision = Assert.Single(fixture.PendingDecisions);
+        switch (transition)
+        {
+            case "completed": fixture.End(); break;
+            case "cancelled": fixture.CancelDecision(decision); break;
+            case "new-prompt": fixture.Begin(Scope with { Prompt = 2 }); break;
+            case "new-session": fixture.Begin(Scope with { Session = "session-b" }); break;
+            case "new-connection": fixture.Begin(Scope with { Connection = 2 }); break;
+        }
+        Assert.False(fixture.Resolve(decision, answer == "once" ? Answer.Once : Answer.Chat));
+        Assert.Equal(CallState.Rejected, receipt.State);
+        Assert.Empty(fixture.Invocations);
+        Assert.Empty(fixture.PendingDecisions);
+        Assert.Equal(0, fixture.GrantCount);
+    }
+
+    [Theory]
+    [InlineData("deny")]
+    [InlineData("once")]
+    [Trait("Contract", "F05")]
+    public void F05_CompletedDecisionCannotBeUpgradedToAChatGrant(string firstAnswer)
+    {
+        var fixture = Fixture(approval: true);
+        fixture.Notice(Call());
+        fixture.Request("rpc-a", Call());
+        var decision = Assert.Single(fixture.PendingDecisions);
+        Assert.True(fixture.Resolve(decision, firstAnswer == "deny" ? Answer.Deny : Answer.Once));
+        Assert.False(fixture.Resolve(decision, Answer.Chat));
+        Assert.Equal(firstAnswer == "deny" ? 0 : 1, fixture.Invocations.Length);
+        Assert.Equal(0, fixture.GrantCount);
+    }
+
+    [Fact]
+    [Trait("Contract", "F05")]
+    public void F05_OldDecisionCannotApproveANewCallWithTheSameCallId()
+    {
+        var fixture = Fixture(approval: true);
+        fixture.Notice(Call());
+        fixture.Request("rpc-a", Call());
+        var stale = Assert.Single(fixture.PendingDecisions);
+        var nextOwner = Scope with { Connection = 2, Prompt = 2 };
+        fixture.Begin(nextOwner);
+        var next = Call() with { Owner = nextOwner };
+        fixture.Notice(next);
+        fixture.Request("rpc-a", next); // HTTP ids are per connection; logical ownership is still checked.
+        var current = Assert.Single(fixture.PendingDecisions);
+        Assert.NotEqual(stale, current);
+        Assert.False(fixture.Resolve(stale, Answer.Chat));
+        Assert.Empty(fixture.Invocations);
+        Assert.Equal(0, fixture.GrantCount);
+        Assert.True(fixture.Resolve(current, Answer.Once));
+        Assert.Single(fixture.Invocations);
+        Assert.Equal(0, fixture.GrantCount);
+    }
+
+    [Fact]
+    [Trait("Contract", "F05")]
+    public void F05_CurrentDecisionCanGrantWithinItsScopeAndEndClearsIt()
+    {
+        var fixture = Fixture(approval: true);
+        fixture.Notice(Call());
+        fixture.Request("rpc-a", Call());
+        Assert.True(fixture.Resolve(Assert.Single(fixture.PendingDecisions), Answer.Chat));
+        Assert.Single(fixture.Invocations);
+        Assert.Equal(1, fixture.GrantCount);
+        fixture.Finish(Call());
+        var next = Call("call-b");
+        fixture.Notice(next);
+        fixture.Request("rpc-b", next);
+        Assert.Equal(2, fixture.Invocations.Length);
+        Assert.Equal(1, fixture.ApprovalRequests);
+        fixture.End();
+        Assert.Equal(0, fixture.GrantCount);
+    }
+}

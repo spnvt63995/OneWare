@@ -7,6 +7,8 @@ End-user documentation lives at [one-ware.com/docs](https://one-ware.com/docs/st
 | Guide | Contents |
 |---|---|
 | [Plugin Development](PluginDevelopment.md) | Module lifecycle, packaging plugins, `OneWare.Essentials` service reference, Universal FPGA project system, AI agents and skills |
+| [Codex ACP](CodexChat.md) | ACP setup, shared chat integration and developer entry points |
+| [Adapter contract](CodexAdapterContract.md) | Synthetic adapter acceptance boundaries and test scope |
 | [Styling](Styling.md) | Design tokens, style classes, icons and UI rules for `.axaml` views |
 | [Source Control](SourceControl.md) | Git integration internals |
 | [Changelog](changelog.md) | User-facing release notes |

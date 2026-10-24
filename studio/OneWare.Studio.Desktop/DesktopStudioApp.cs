@@ -18,6 +18,7 @@ using Microsoft.Extensions.Logging;
 using OneWare.Chat;
 using OneWare.CloudIntegration;
 using OneWare.Copilot;
+using OneWare.Codex;
 using OneWare.Core.Data;
 using OneWare.Core.ModuleLogic;
 using OneWare.Core.ViewModels.DockViews;
@@ -69,6 +70,7 @@ public class DesktopStudioApp : StudioApp
         moduleCatalog.AddModule<TypeScriptModule>();
         moduleCatalog.AddModule<ChatModule>();
         moduleCatalog.AddModule<CopilotModule>();
+        moduleCatalog.AddModule<CodexModule>();
         moduleCatalog.AddModule<OneWareCloudIntegrationModule>();
     }
 

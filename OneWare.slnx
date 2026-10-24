@@ -91,10 +91,13 @@
     <File Path="CONTRIBUTING.md" />
     <File Path="docs/PluginDevelopment.md" />
     <File Path="docs/README.md" />
+    <File Path="docs/CodexChat.md" />
     <File Path="docs/SourceControl.md" />
     <File Path="docs/Styling.md" />
+    <File Path="docs/CodexAdapterContract.md" />
   </Folder>
   <Folder Name="/Extensions/">
+    <Project Path="src/OneWare.Codex/OneWare.Codex.csproj" />
     <Project Path="src/OneWare.CloudIntegration/OneWare.CloudIntegration.csproj" />
     <Project Path="src/OneWare.Copilot/OneWare.Copilot.csproj" />
     <Project Path="src/OneWare.ImageViewer/OneWare.ImageViewer.csproj" />
@@ -134,6 +137,10 @@
     <Project Path="studio/OneWare.Studio/OneWare.Studio.csproj" />
   </Folder>
   <Folder Name="/Tests/">
+    <Project Path="tests/OneWare.Codex.AdapterBoundaryTests/OneWare.Codex.AdapterBoundaryTests.csproj" />
+    <Project Path="tests/OneWare.Codex.AdapterContractTests/OneWare.Codex.AdapterContractTests.csproj" />
+    <Project Path="tests/OneWare.Codex.UnitTests/OneWare.Codex.UnitTests.csproj" />
+    <Project Path="tests/OneWare.Codex.AcpVerification/OneWare.Codex.AcpVerification.csproj" />
     <Project Path="tests/OneWare.ApplicationCommands.UnitTests/OneWare.ApplicationCommands.UnitTests.csproj" />
     <Project Path="tests/OneWare.Chat.UnitTests/OneWare.Chat.UnitTests.csproj" />
     <Project Path="tests/OneWare.Copilot.UnitTests/OneWare.Copilot.UnitTests.csproj" />
