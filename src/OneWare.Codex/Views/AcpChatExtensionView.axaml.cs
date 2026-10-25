@@ -14,6 +14,7 @@ public partial class AcpChatExtensionView : UserControl
         ReasoningButton.Flyout!.Opened += LoadOptions;
         ModelList.AddHandler(KeyDownEvent, PickerKeyDown, RoutingStrategies.Tunnel);
         ReasoningList.AddHandler(KeyDownEvent, PickerKeyDown, RoutingStrategies.Tunnel);
+        ContextSizeList.AddHandler(KeyDownEvent, PickerKeyDown, RoutingStrategies.Tunnel);
         ModelSearch.AddHandler(KeyDownEvent, SearchKeyDown, RoutingStrategies.Tunnel);
     }
 
@@ -41,6 +42,18 @@ public partial class AcpChatExtensionView : UserControl
         if (ModelList.SelectedItem != null) ModelButton.Flyout?.Hide();
     }
 
+    private async void ContextSelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (DataContext is AcpChatService { IsProjectingOptions: false } service &&
+            ContextSizeList.SelectedItem is AcpContextSize choice && choice != service.SelectedContextSize)
+            await service.SelectContextSizeAsync(choice);
+    }
+
+    private void ContextPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        if (ContextSizeList.SelectedItem != null) ContextTierButton.Flyout?.Hide();
+    }
+
     private void ReasoningPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
         if (ReasoningList.SelectedItem != null) ReasoningButton.Flyout?.Hide();
@@ -49,7 +62,8 @@ public partial class AcpChatExtensionView : UserControl
     private void PickerKeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter) return;
-        (ReferenceEquals(sender, ModelList) ? ModelButton : ReasoningButton).Flyout?.Hide();
+        (ReferenceEquals(sender, ModelList) ? ModelButton : ReferenceEquals(sender, ContextSizeList)
+            ? ContextTierButton : ReasoningButton).Flyout?.Hide();
         e.Handled = true;
     }
 

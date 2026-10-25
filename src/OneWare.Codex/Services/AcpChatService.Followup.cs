@@ -68,7 +68,8 @@ internal sealed partial class AcpChatService
             lock (_family.Sync)
             {
                 ObjectDisposedException.ThrowIf(_disposed || _family.Closing || _family.AccountChanging, this);
-                child = new AcpChatService(_host, _profile, () => definition, _factory, _dock, null, null, _family, false);
+                child = new AcpChatService(_host, _profile, () => definition, _factory, _dock, null, null,
+                    _family, false, _readContextCatalog);
             }
         }
         catch { cancellation.Dispose(); throw; }

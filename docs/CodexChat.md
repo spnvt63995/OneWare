@@ -16,6 +16,16 @@ The footer exposes model, reasoning and approval choices together with usage/con
 Supported choices come from the connected runtime. Saved choices apply to subsequent work; changes
 during a turn follow the provider's synchronization and ownership rules.
 
+Models with distinct default and maximum context limits also show a **Context length** picker beside
+the reasoning choice. It uses Codex's model catalog, shows token lengths, and keeps the selected tier
+in the application defaults and each conversation. Changing it between responses resumes the same
+ACP session with `model_context_window` forwarded through `CODEX_CONFIG`; history is preserved.
+Models with one size or unavailable limits keep the picker hidden. A saved long tier falls back to the
+default size on such models and remains selected when returning to a model that offers both sizes.
+Context limits are read using the same Codex executable and profile's `debug models` command; API-key
+and external-provider sessions do not use the ChatGPT catalog. This does not change the model's real
+maximum or set a separate automatic-compaction threshold.
+
 Use the **/** button next to the model picker to search the current session's commands, read their
 descriptions and enter arguments. You can also type a command directly in the chat input.
 Supported commands are `/status`, `/skills`, `/mcp`, `/mcp reconnect`, `/compact`, `/review`, `/review-branch <branch>` and

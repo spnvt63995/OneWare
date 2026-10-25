@@ -4,7 +4,7 @@
              xmlns:views="clr-namespace:OneWare.Codex.Views"
              x:Class="OneWare.Codex.Views.AcpChatExtensionView"
              x:DataType="services:AcpChatService">
-    <Grid ColumnDefinitions="Auto,3*,2*" ColumnSpacing="4" MaxWidth="410" Height="22">
+    <Grid ColumnDefinitions="Auto,3*,2*,Auto" ColumnSpacing="4" MaxWidth="410" Height="22">
         <views:AcpCommandsView />
         <Button Name="ModelButton" Grid.Column="1" Classes="small" HorizontalContentAlignment="Stretch"
                 IsEnabled="{Binding CanLoadOptions}"
@@ -68,6 +68,29 @@
                            VerticalAlignment="Center" />
                 <PathIcon Grid.Column="1" Classes="muted" Data="{StaticResource Icon.ChevronDown}" Width="8" Height="8" />
             </Grid>
+        </Button>
+        <Button Name="ContextTierButton" Grid.Column="3" Classes="small" VerticalAlignment="Center"
+                IsVisible="{Binding ShowContextSize}" IsEnabled="{Binding CanEditContextSize}"
+                AutomationProperties.Name="ACP context length" AutomationProperties.AutomationId="AcpContextLength"
+                ToolTip.Tip="Context length">
+            <Button.Flyout>
+                <Flyout FlyoutPresenterClasses="flush" Placement="TopEdgeAlignedRight">
+                    <ListBox Name="ContextSizeList" Classes="transparent" BorderThickness="0" MinWidth="140"
+                             ItemsSource="{Binding ContextSizes}"
+                             SelectedItem="{Binding SelectedContextSize, Mode=OneWay}"
+                             SelectionChanged="ContextSelectionChanged" PointerReleased="ContextPointerReleased">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="services:AcpContextSize">
+                                <TextBlock Text="{Binding Label}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Flyout>
+            </Button.Flyout>
+            <StackPanel Orientation="Horizontal" Spacing="5">
+                <TextBlock Classes="caption" Text="{Binding ContextSizeLabel}" VerticalAlignment="Center" />
+                <PathIcon Classes="muted" Data="{StaticResource Icon.ChevronDown}" Width="8" Height="8" />
+            </StackPanel>
         </Button>
     </Grid>
 </UserControl>

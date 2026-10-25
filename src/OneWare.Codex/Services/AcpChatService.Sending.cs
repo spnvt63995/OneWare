@@ -205,7 +205,7 @@ internal sealed partial class AcpChatService
                     {
                         var (tools, revision) = await CaptureToolsAsync();
                         input = input with { Tools = tools, ToolsRevision = revision };
-                        await EnsureSessionAsync(directory, input.Tools, cancellation.Token);
+                        await EnsureSessionAsync(directory, input.Tools, cancellation.Token, input.Model);
                         if (input.Command is { } command) await ValidateRuntimeCommandAsync(command, cancellation.Token);
                         ValidateContent(input);
                         await SelectAsync("mode", "read-only", cancellation.Token);

@@ -5,7 +5,7 @@ using OneWare.Essentials.Services;
 
 namespace OneWare.Codex.Services;
 
-internal sealed record AcpSelection(string Model, string? Effort);
+internal sealed record AcpSelection(string Model, string? Effort, string ContextTier = AcpChatService.DefaultContextTier);
 internal sealed record AcpOptionChoice(string Value, string Label, string? Description);
 
 internal sealed partial class AcpChatService
@@ -111,6 +111,7 @@ internal sealed partial class AcpChatService
         // The active response keeps its model. ACP accepts session config changes for
         // the next prompt; do not wait on the gate held for the whole running turn.
         if (id == null && _updatingOptions || !CanLoadOptions || id != null && !CanEditOptions) return;
+        if (id == "context_window" && !CanEditContextSize) return;
         await _submission.WaitAsync();
         var entered = false;
         var configuring = false;
@@ -118,6 +119,7 @@ internal sealed partial class AcpChatService
         try
         {
             if (!CanLoadOptions || id != null && !CanEditOptions) return;
+            if (id == "context_window" && !CanEditContextSize) return;
             if (id == null && _sending != 0)
             {
                 await PublishOptionsAsync();
@@ -180,7 +182,21 @@ internal sealed partial class AcpChatService
 
             if (id != null)
             {
-                var selection = new AcpSelection(model, effort);
+                var tier = id == "context_window" ? value! : _selection.ContextTier;
+                if (id == "context_window" && !ContextChoices(model).Any(x => x.Tier == tier))
+                    throw new InvalidOperationException("This model does not offer that context length.");
+                if (active == null)
+                {
+                    // Context is a launch/session setting. Resume the same session before saving the choice.
+                    await EnsureSessionAsync(Path.GetFullPath(context.Directory), await ToolsAsync(),
+                        cancellation.Token, model, tier);
+                    await SelectAsync("model", model, cancellation.Token);
+                    if (effort != null) await SelectAsync("reasoning_effort", effort, cancellation.Token);
+                    connection = _connection;
+                    session = _session;
+                    generation = _generation;
+                }
+                var selection = new AcpSelection(model, effort, tier);
                 // Keep the user's choice separate from agent overrides and remote observations.
                 lock (_sync)
                 {
@@ -247,6 +263,7 @@ internal sealed partial class AcpChatService
         RefreshCommandProjection();
         var projection = ++_projection;
         IsProjectingOptions = true;
+        RefreshContextProjection();
         var models = Choices("model");
         var efforts = CurrentOption("model") == EffectiveModel ? Choices("reasoning_effort") : [];
         if (!_models.SequenceEqual(models)) _models = models;
@@ -271,6 +288,7 @@ internal sealed partial class AcpChatService
             if (projection != _projection) return;
             OnPropertyChanged(nameof(SelectedModelChoice));
             OnPropertyChanged(nameof(SelectedReasoningEffort));
+            OnPropertyChanged(nameof(SelectedContextSize));
             IsProjectingOptions = false;
         }, DispatcherPriority.Background);
     }

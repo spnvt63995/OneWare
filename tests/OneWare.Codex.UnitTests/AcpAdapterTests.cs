@@ -288,7 +288,8 @@ internal sealed class AcpHarness : IAsyncDisposable
     public Dictionary<string, IExtendedDocument> Documents { get; } = [];
 
     public AcpHarness(bool confirm = false, AcpProfile? profile = null, Func<IAgentConnection>? factory = null,
-        bool initializeTools = true, ISettingsService? settings = null, IChatAgentService? agents = null)
+        bool initializeTools = true, ISettingsService? settings = null, IChatAgentService? agents = null,
+        Func<CancellationToken, Task<IReadOnlyDictionary<string, AcpContextLimits>>>? contextCatalog = null)
     {
         _confirm = confirm;
         Workspace = profile == null
@@ -311,7 +312,8 @@ internal sealed class AcpHarness : IAsyncDisposable
         if (initializeTools) Provider.GetTools();
         Register("ACP_FIXTURE_");
         Host = new OneWareHost(Provider, dock, projects);
-        Service = new AcpChatService(Host, Profile, () => Agent, factory ?? (() => Peer), dock, settings, agents);
+        Service = new AcpChatService(Host, Profile, () => Agent, factory ?? (() => Peer), dock, settings, agents,
+            contextCatalog: contextCatalog);
         Service.EventReceived += (_, e) => Events.Add(e);
         Provider.FunctionStarted += (_, e) => Starts.Add(e);
     }

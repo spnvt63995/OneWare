@@ -46,7 +46,7 @@ internal sealed partial class AcpChatService
             // Share the profile/authentication and native tool registry, but give each chat its
             // own transport: ACP cancellation retires a connection to reject late prompt events.
             return new AcpChatService(_host, _profile, _agent, _factory, _dock, _settings, _agents,
-                _family, false);
+                _family, false, _readContextCatalog);
         }
     }
 

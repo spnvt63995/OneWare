@@ -7,7 +7,7 @@ using OneWare.Codex.Services;
 namespace OneWare.Codex.Protocol;
 
 /// <summary>One owned stdio process. The reader never waits for UI/tool replies.</summary>
-internal sealed class AcpConnection(AcpProfile profile) : IAgentConnection
+internal sealed class AcpConnection(AcpProfile profile, long? contextWindow = null) : IAgentConnection
 {
     private readonly ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> _pending = new();
     private readonly ConcurrentDictionary<long, Task> _requests = new();
@@ -43,7 +43,18 @@ internal sealed class AcpConnection(AcpProfile profile) : IAgentConnection
         };
         start.Environment["CODEX_HOME"] = profile.Home;
         if (profile.CodexExecutable != null) start.Environment["CODEX_PATH"] = profile.CodexExecutable;
-        start.Environment["CODEX_CONFIG"] = JsonSerializer.Serialize(new
+        start.Environment["CODEX_CONFIG"] = CreateConfig(profile, contextWindow);
+        foreach (var argument in profile.Arguments) start.ArgumentList.Add(argument);
+        _process = Process.Start(start) ?? throw new IOException("Could not start Codex.");
+        _reader = ReadAsync();
+        // Drain stderr without retaining potentially private config, paths or authentication data.
+        _errors = DrainErrorsAsync();
+        return Task.CompletedTask;
+    }
+
+    internal static string CreateConfig(AcpProfile profile, long? contextWindow)
+    {
+        var config = JsonSerializer.SerializeToNode(new
         {
             sandbox_mode = "read-only", approval_policy = "never", web_search = "disabled",
             cli_auth_credentials_store = "file",
@@ -53,13 +64,9 @@ internal sealed class AcpConnection(AcpProfile profile) : IAgentConnection
                 apps = false, plugins = false, hooks = false, computer_use = false,
                 browser_use = false, multi_agent = false, multi_agent_v2 = false
             }
-        });
-        foreach (var argument in profile.Arguments) start.ArgumentList.Add(argument);
-        _process = Process.Start(start) ?? throw new IOException("Could not start Codex.");
-        _reader = ReadAsync();
-        // Drain stderr without retaining potentially private config, paths or authentication data.
-        _errors = DrainErrorsAsync();
-        return Task.CompletedTask;
+        })!.AsObject();
+        if (contextWindow is > 0) config["model_context_window"] = contextWindow.Value;
+        return config.ToJsonString();
     }
 
     public async Task<JsonElement> RequestAsync(string method, object parameters,

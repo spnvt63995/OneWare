@@ -29,7 +29,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
     private readonly OneWareHost _host;
     private readonly AcpProfile _profile;
     private readonly Func<ChatAgentDefinition?> _agent;
-    private readonly Func<IAgentConnection> _factory;
+    private readonly Func<IAgentConnection>? _factory;
     private readonly SemaphoreSlim _gate = new(1);
     private readonly SemaphoreSlim _execution = new(1);
     private readonly object _sync = new();
@@ -98,14 +98,17 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
 
     public AcpChatService(OneWareHost host, AcpProfile profile, Func<ChatAgentDefinition?> agent,
         Func<IAgentConnection>? factory = null, IMainDockService? dock = null,
-        ISettingsService? settings = null, IChatAgentService? agents = null, AcpRuntime? runtime = null)
-        : this(host, profile, agent, factory, dock, settings, agents, new SessionFamily { Runtime = runtime }, true)
+        ISettingsService? settings = null, IChatAgentService? agents = null, AcpRuntime? runtime = null,
+        Func<CancellationToken, Task<IReadOnlyDictionary<string, AcpContextLimits>>>? contextCatalog = null)
+        : this(host, profile, agent, factory, dock, settings, agents, new SessionFamily { Runtime = runtime }, true,
+            contextCatalog)
     {
     }
 
     private AcpChatService(OneWareHost host, AcpProfile profile, Func<ChatAgentDefinition?> agent,
         Func<IAgentConnection>? factory, IMainDockService? dock,
-        ISettingsService? settings, IChatAgentService? agents, SessionFamily family, bool ownsFamily)
+        ISettingsService? settings, IChatAgentService? agents, SessionFamily family, bool ownsFamily,
+        Func<CancellationToken, Task<IReadOnlyDictionary<string, AcpContextLimits>>>? contextCatalog = null)
     {
         _family = family;
         _ownsFamily = ownsFamily;
@@ -113,7 +116,8 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         _host = host;
         _profile = profile;
         _agent = agent;
-        _factory = factory ?? (() => new AcpConnection(profile));
+        _factory = factory;
+        _readContextCatalog = contextCatalog ?? (token => AcpContextCatalog.ReadAsync(profile, token));
         _host.ToolsChanged += OnToolsChanged;
         Attachments = new AcpAttachments(dock);
         InitializeOptions(settings, agents);
@@ -174,7 +178,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         if (_ready && _connection?.IsConnected == true) return;
         await DisconnectAsync();
         Directory.CreateDirectory(_profile.Home);
-        var connection = _factory();
+        var connection = _factory?.Invoke() ?? new AcpConnection(_profile, _contextWindow);
         _connection = connection;
         var generation = ++_generation;
         connection.Notification += (method, data) => Notification(connection, generation, method, data);
@@ -252,13 +256,21 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         });
 
     private async Task EnsureSessionAsync(string directory, Dictionary<string, OneWareTool> tools,
-        CancellationToken token = default)
+        CancellationToken token = default, string? model = null, string? contextTier = null)
     {
         if (_session != null && _cwd != directory)
             throw new InvalidOperationException(
                 "The workspace changed. Open the original workspace or start a new ACP chat.");
         await ConnectAsync(token);
         if (_authKind == "none") throw new InvalidOperationException("Sign in to Codex ACP first.");
+        await EnsureContextCatalogAsync(token);
+        var contextWindow = ContextWindow(model ?? EffectiveModel, contextTier ?? _selection.ContextTier);
+        if (_contextWindow != contextWindow)
+        {
+            _contextWindow = contextWindow;
+            await DisconnectAsync();
+            await ConnectAsync(token);
+        }
         var descriptors = Describe(tools);
         if (_mcp != null && !_mcp.Matches(descriptors))
         {
