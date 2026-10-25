@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:models="clr-namespace:OneWare.Essentials.Models;assembly=OneWare.Essentials"
+             x:Class="OneWare.Chat.Views.ChatMessages.ChatToolContentView"
+             x:DataType="models:ChatToolContent">
+    <StackPanel Classes="section">
+        <SelectableTextBlock Classes="mono" TextWrapping="Wrap" Text="{Binding Text}" IsVisible="{Binding IsText}" />
+        <StackPanel Classes="section" IsVisible="{Binding IsImage}">
+            <TextBlock Classes="caption" Text="{Binding Title}" />
+            <Image x:Name="Thumbnail" MaxHeight="96" MaxWidth="240" Stretch="Uniform" HorizontalAlignment="Left" />
+            <TextBlock x:Name="ImageError" Classes="muted" TextWrapping="Wrap" IsVisible="False" />
+            <Expander x:Name="ImageExpander" Header="Expand image">
+                <Image x:Name="FullImage" MaxHeight="512" Stretch="Uniform" />
+            </Expander>
+        </StackPanel>
+        <Expander x:Name="DiffExpander" Header="{Binding Title}" IsVisible="{Binding IsDiff}"
+                  HorizontalContentAlignment="Stretch">
+            <StackPanel Classes="section">
+                <TextBlock Classes="caption muted" TextWrapping="Wrap"
+                           Text="Reported change segment · line numbers are relative to this segment." />
+                <Grid ColumnDefinitions="*,*">
+                    <TextBlock Classes="caption" Text="Before" />
+                    <TextBlock Grid.Column="1" Classes="caption" Text="After" />
+                </Grid>
+                <ContentControl x:Name="DiffPreview" HorizontalContentAlignment="Stretch" />
+            </StackPanel>
+        </Expander>
+    </StackPanel>
+</UserControl>

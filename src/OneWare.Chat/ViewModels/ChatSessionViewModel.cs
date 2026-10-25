@@ -1185,21 +1185,28 @@ public partial class ChatSessionViewModel : ObservableObject
             }
             case ChatToolExecutionStartEvent x:
             {
-                // Tool calls of the main agent are rendered from the function provider events,
-                // which also carry the live output and a stop button. Tools of the backend itself
-                // are only reflected in the status.
+                // Host-owned tools already render through the function provider. Backends can
+                // opt their own tools into transcript cards without duplicating host entries.
                 if (x.AgentId == null)
                 {
                     if (!x.IsClientTool && !string.IsNullOrWhiteSpace(x.ToolCallId))
-                        Dispatcher.UIThread.Post(() =>
+                        PostToolEvent(sender, () =>
                         {
                             _activity.ToolStarted(x.ToolCallId, x.Tool);
+                            if (x.ShowInTranscript)
+                            {
+                                AddMessage(new ChatMessageToolViewModel(x.ToolCallId, x.Tool)
+                                {
+                                    IsToolRunning = true, ToolOutput = x.Detail, SourceToolCallId = x.ToolCallId
+                                });
+                                NotifyContentAdded();
+                            }
                             UpdateWorkingStatus();
                         });
                     break;
                 }
 
-                Dispatcher.UIThread.Post(() =>
+                PostToolEvent(sender, () =>
                 {
                     StartSubAgentTool(x);
                     NotifyContentAdded();
@@ -1208,12 +1215,12 @@ public partial class ChatSessionViewModel : ObservableObject
             }
             case ChatToolExecutionUpdateEvent x:
             {
-                Dispatcher.UIThread.Post(() => UpdateSubAgentTool(x));
+                PostToolEvent(sender, () => UpdateSubAgentTool(x));
                 break;
             }
             case ChatToolExecutionCompleteEvent x:
             {
-                Dispatcher.UIThread.Post(() =>
+                PostToolEvent(sender, () =>
                 {
                     CompleteSubAgentTool(x);
                     _activity.ToolCompleted(x.ToolCallId);
@@ -1601,7 +1608,7 @@ public partial class ChatSessionViewModel : ObservableObject
     /// </summary>
     private void StartSubAgentTool(ChatToolExecutionStartEvent start)
     {
-        if (start.AgentId == null || !_subAgents.TryGetValue(start.AgentId, out var subAgent)) return;
+        if (start.AgentId == null || !_subAgents.TryGetValue(start.AgentId, out var subAgent) || !subAgent.IsRunning) return;
 
         subAgent.StatusText = start.Tool;
 
@@ -1627,16 +1634,13 @@ public partial class ChatSessionViewModel : ObservableObject
 
     private void UpdateSubAgentTool(ChatToolExecutionUpdateEvent update)
     {
-        if (update.AgentId == null || !_subAgents.TryGetValue(update.AgentId, out var subAgent) ||
-            !subAgent.IsRunning) return;
-        var tool = subAgent.Items.OfType<ChatMessageToolViewModel>().LastOrDefault(x =>
-            x.SourceToolCallId == update.ToolCallId && x.IsToolRunning);
-        tool?.UpdateProgress(update.Detail, update.Output);
+        var tool = RunningTool(update.AgentId, update.ToolCallId);
+        tool?.UpdateProgress(update.Detail, update.Output, update.Content);
     }
 
     private void CompleteSubAgentTool(ChatToolExecutionCompleteEvent complete)
     {
-        var tool = FindToolMessage(complete.ToolCallId);
+        var tool = RunningTool(complete.AgentId, complete.ToolCallId);
         if (tool == null || !tool.IsToolRunning) return;
 
         tool.IsToolRunning = false;
@@ -1644,7 +1648,7 @@ public partial class ChatSessionViewModel : ObservableObject
         tool.IsSuccessful = complete.Success;
 
         if (tool.HasProgress)
-            tool.UpdateProgress(null, complete.Output);
+            tool.UpdateProgress(null, complete.Output, complete.Content);
         else if (!string.IsNullOrWhiteSpace(complete.Output))
         {
             tool.ToolOutput = string.IsNullOrWhiteSpace(tool.ToolOutput)
@@ -1653,6 +1657,27 @@ public partial class ChatSessionViewModel : ObservableObject
         }
 
         RequestSaveState();
+    }
+
+    private ChatMessageToolViewModel? RunningTool(string? agentId, string callId)
+    {
+        IEnumerable<IChatMessage> messages = Messages;
+        if (agentId != null)
+        {
+            if (!_subAgents.TryGetValue(agentId, out var agent) || !agent.IsRunning) return null;
+            messages = agent.Items;
+        }
+        return messages.OfType<ChatMessageToolViewModel>().LastOrDefault(x =>
+            x.IsToolRunning && (x.SourceToolCallId == callId || x.Id == callId));
+    }
+
+    private void PostToolEvent(object? sender, Action action)
+    {
+        var generation = _planGeneration;
+        Dispatcher.UIThread.Post(() =>
+        {
+            if (generation == _planGeneration && ReferenceEquals(Service, sender)) action();
+        });
     }
 
     /// <summary>

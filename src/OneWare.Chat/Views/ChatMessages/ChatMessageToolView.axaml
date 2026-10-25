@@ -5,6 +5,7 @@
              xmlns:viewModels="clr-namespace:OneWare.Chat.ViewModels"
              xmlns:controls="clr-namespace:OneWare.Essentials.Controls;assembly=OneWare.Essentials"
              xmlns:chatMessages="clr-namespace:OneWare.Chat.ViewModels.ChatMessages"
+             xmlns:views="clr-namespace:OneWare.Chat.Views.ChatMessages"
              mc:Ignorable="d"
              x:Class="OneWare.Chat.Views.ChatMessages.ChatMessageToolView"
              x:DataType="chatMessages:ChatMessageToolViewModel">
@@ -15,8 +16,10 @@
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="{Binding ToolName}" />
                     <Panel IsVisible="{Binding !IsToolRunning}">
-                        <TextBlock Text=" ✓" Foreground="{DynamicResource SuccessBrush}" IsVisible="{Binding IsSuccessful}" />
-                        <TextBlock Text=" x" Foreground="{DynamicResource ErrorBrush}" IsVisible="{Binding !IsSuccessful}" />
+                        <TextBlock Text=" ✓" Foreground="{DynamicResource SuccessBrush}"
+                                   IsVisible="{Binding IsSuccessful}" />
+                        <TextBlock Text=" x" Foreground="{DynamicResource ErrorBrush}"
+                                   IsVisible="{Binding !IsSuccessful}" />
                     </Panel>
                 </StackPanel>
 
@@ -24,21 +27,38 @@
                                   IsVisible="{Binding IsToolRunning}" />
 
                 <Button Grid.Column="2" VerticalAlignment="Center" Padding="2"
-                        IsVisible="{Binding IsToolRunning}"
+                        IsVisible="{Binding !!StopCommand}"
                         Command="{Binding StopCommand}"
                         ToolTip.Tip="Stop">
                     <Image Source="{DynamicResource VSImageLib2019.Stop_16x}" Height="12" />
                 </Button>
             </Grid>
         </Expander.Header>
-        <Border Margin="1 4 1 0" Background="{DynamicResource ChatBubbleBrush}" Classes="RoundBorder"
-                MaxHeight="200" Padding="5">
-            <ScrollViewer x:Name="OutputScrollViewer" HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto">
-                <SelectableTextBlock TextWrapping="Wrap" FontFamily="{DynamicResource EditorFont}"
-                                     Text="{Binding ToolOutput}" />
-            </ScrollViewer>
-        </Border>
+        <StackPanel Classes="section">
+            <Border IsVisible="{Binding !HasStructuredContent}" Margin="1 4 1 0"
+                    Background="{DynamicResource ChatBubbleBrush}" Classes="RoundBorder"
+                    MaxHeight="200" Padding="5">
+                <ScrollViewer x:Name="OutputScrollViewer" HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <SelectableTextBlock TextWrapping="Wrap" FontFamily="{DynamicResource EditorFont}"
+                                         Text="{Binding ToolOutput}" />
+                </ScrollViewer>
+            </Border>
+            <Border IsVisible="{Binding HasStructuredContent}" Classes="inset" MaxHeight="640">
+                <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Classes="section">
+                        <SelectableTextBlock Classes="mono muted" TextWrapping="Wrap" Text="{Binding ToolDetail}" />
+                        <ItemsControl ItemsSource="{Binding ToolContent}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <views:ChatToolContentView />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </StackPanel>
     </Expander>
 
 </UserControl>

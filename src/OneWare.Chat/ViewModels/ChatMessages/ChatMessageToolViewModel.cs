@@ -2,6 +2,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OneWare.Essentials.Controls;
+using OneWare.Essentials.Models;
 
 namespace OneWare.Chat.ViewModels.ChatMessages;
 
@@ -34,6 +35,24 @@ public class ChatMessageToolViewModel : ObservableObject, IChatMessage, IEstimat
     
     public DateTimeOffset Timestamp { get; }
 
+    public string? ToolDetail
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
+    public IReadOnlyList<ChatToolContent>? ToolContent
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value == null ? null : ChatToolContentLimits.Normalize(value)))
+                OnPropertyChanged(nameof(HasStructuredContent));
+        }
+    }
+
+    public bool HasStructuredContent => ToolContent != null;
+
     public bool IsToolRunning
     {
         get;
@@ -58,12 +77,14 @@ public class ChatMessageToolViewModel : ObservableObject, IChatMessage, IEstimat
     private string? _progressOutput;
     internal bool HasProgress { get; private set; }
 
-    internal void UpdateProgress(string? detail, string? output)
+    internal void UpdateProgress(string? detail, string? output, IReadOnlyList<ChatToolContent>? content = null)
     {
         if (!HasProgress) _progressDetail = ToolOutput;
         HasProgress = true;
         if (detail != null) _progressDetail = detail;
         if (output != null) _progressOutput = output;
+        ToolDetail = _progressDetail;
+        if (content != null) ToolContent = content;
         ToolOutput = string.IsNullOrWhiteSpace(_progressDetail) ? _progressOutput :
             string.IsNullOrWhiteSpace(_progressOutput) ? _progressDetail : _progressDetail + "\n" + _progressOutput;
     }

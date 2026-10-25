@@ -72,6 +72,8 @@ public sealed class ChatToolExecutionStartEvent(string tool, string? toolCallId 
 
     /// <summary>Short description of what the tool was called with, when known.</summary>
     public string? Detail { get; init; }
+    /// <summary>Show a backend-owned tool in the parent transcript as well as in delegated tasks.</summary>
+    public bool ShowInTranscript { get; init; }
 }
 
 /// <summary>Current display snapshots for a running tool. Null fields keep the previous value.</summary>
@@ -81,6 +83,8 @@ public sealed class ChatToolExecutionUpdateEvent(string toolCallId, string? deta
     public string ToolCallId { get; } = toolCallId;
     public string? Detail { get; } = detail;
     public string? Output { get; } = output;
+    /// <summary>Replacement result snapshot. Null retains the previous snapshot; empty clears it.</summary>
+    public IReadOnlyList<ChatToolContent>? Content { get; init; }
 }
 
 /// <summary>
@@ -94,6 +98,7 @@ public sealed class ChatToolExecutionCompleteEvent(string toolCallId, bool succe
     public bool Success { get; } = success;
 
     public string? Output { get; } = output;
+    public IReadOnlyList<ChatToolContent>? Content { get; init; }
 }
 
 /// <summary>

@@ -36,6 +36,8 @@ internal static class ChatTranscript
                     Id = tool.Id,
                     ToolName = tool.ToolName,
                     ToolOutput = tool.ToolOutput,
+                    ToolDetail = tool.ToolDetail,
+                    ToolContent = tool.ToolContent,
                     IsSuccessful = tool.IsSuccessful
                 };
             case ChatMessageErrorViewModel:
@@ -103,6 +105,8 @@ internal static class ChatTranscript
                 message = new ChatMessageToolViewModel(state.Id ?? Guid.NewGuid().ToString("N"), state.ToolName)
                 {
                     ToolOutput = state.ToolOutput,
+                    ToolDetail = state.ToolDetail,
+                    ToolContent = state.ToolContent,
                     IsSuccessful = state.IsSuccessful,
                     IsToolRunning = false
                 };
@@ -150,8 +154,26 @@ internal static class ChatTranscript
         }
     }
 
-    public static List<ChatMessageState> BuildStates(IEnumerable<IChatMessage> messages) =>
-        messages.Select(BuildMessageState).OfType<ChatMessageState>().ToList();
+    public static List<ChatMessageState> BuildStates(IEnumerable<IChatMessage> messages)
+    {
+        var states = messages.Select(BuildMessageState).OfType<ChatMessageState>().ToList();
+        var remaining = ChatToolContentLimits.MaxHistoryImageBytes;
+        BoundImages(states);
+        return states;
+
+        void BoundImages(IEnumerable<ChatMessageState> items)
+        {
+            foreach (var state in items)
+            {
+                if (state.ToolContent != null)
+                {
+                    state.ToolContent = ChatToolContentLimits.Normalize(state.ToolContent, Math.Max(0, remaining));
+                    remaining -= ChatToolContentLimits.ImageBytes(state.ToolContent);
+                }
+                BoundImages(state.Children);
+            }
+        }
+    }
 
     public static string BuildChatName(IReadOnlyCollection<ChatMessageState> messages) =>
         BuildChatName(messages.FirstOrDefault(x => x.Kind == ChatMessageKind.User)?.Message);
@@ -183,6 +205,8 @@ internal sealed class ChatMessageState
     public string? Id { get; set; }
     public string? ToolName { get; set; }
     public string? ToolOutput { get; set; }
+    public string? ToolDetail { get; set; }
+    public IReadOnlyList<ChatToolContent>? ToolContent { get; set; }
     public string? SkillName { get; set; }
 
     /// <summary>Instructions a sub-agent was started with.</summary>

@@ -445,7 +445,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
                         call.Update(update);
                         turn.BackendCalls.Add(id, call);
                         Emit(new ChatToolExecutionStartEvent(Text(update, "title") ?? "ACP tool", id)
-                            { Detail = call.Detail });
+                            { Detail = call.Detail, ShowInTranscript = true });
                         PublishRuntimeTool(turn, id, call, update);
                     }
 

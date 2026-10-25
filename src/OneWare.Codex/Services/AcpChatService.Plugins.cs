@@ -178,11 +178,11 @@ internal sealed partial class AcpChatService
             ChatSkillLoadedEvent x => new ChatSkillLoadedEvent(x.SkillName, x.Content) { AgentId = context.Id },
             ChatToolExecutionStartEvent x => new ChatToolExecutionStartEvent(x.Tool,
                 x.ToolCallId == null ? null : DisplayCallId(x.ToolCallId), x.IsClientTool)
-                { AgentId = context.Id, Detail = x.Detail },
+                { AgentId = context.Id, Detail = x.Detail, ShowInTranscript = x.ShowInTranscript },
             ChatToolExecutionCompleteEvent x => new ChatToolExecutionCompleteEvent(DisplayCallId(x.ToolCallId),
-                x.Success, x.Output) { AgentId = context.Id },
+                x.Success, x.Output) { AgentId = context.Id, Content = x.Content },
             ChatToolExecutionUpdateEvent x => new ChatToolExecutionUpdateEvent(DisplayCallId(x.ToolCallId),
-                x.Detail, x.Output) { AgentId = context.Id },
+                x.Detail, x.Output) { AgentId = context.Id, Content = x.Content },
             ChatErrorEvent x => new ChatErrorEvent(x.Message ?? "Delegated task failed.") { AgentId = context.Id },
             ChatPermissionRequestEvent or ChatUserInputRequestEvent or
                 ChatSubAgentStartedEvent or ChatSubAgentCompletedEvent => value,

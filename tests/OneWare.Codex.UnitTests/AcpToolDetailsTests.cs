@@ -126,7 +126,9 @@ public sealed class AcpToolDetailsTests
             new { type = "diff", path = "sample.txt", oldText = "old", newText = "UNSUPPORTED_DIFF" },
             new { type = "terminal", terminalId = "UNSUPPORTED_TERMINAL" }
         }}));
-        Assert.Null(call.Output);
+        Assert.Equal("", call.Output);
+        Assert.Equal(new[] { ChatToolContentKind.Notice, ChatToolContentKind.Diff, ChatToolContentKind.Notice },
+            call.Content!.Select(x => x.Kind));
         Assert.Equal(detail, call.Detail);
     }
 
