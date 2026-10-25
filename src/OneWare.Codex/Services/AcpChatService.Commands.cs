@@ -218,6 +218,7 @@ internal sealed partial class AcpChatService
             ResetCommandsLocked();
             _collectingCommands = true;
             _pendingCompactions = [];
+            _pendingNotices = [];
         }
         try
         {
@@ -238,7 +239,11 @@ internal sealed partial class AcpChatService
         }
         catch
         {
-            lock (_sync) _pendingCompactions = null;
+            lock (_sync)
+            {
+                _pendingCompactions = null;
+                _pendingNotices = null;
+            }
             throw;
         }
         finally

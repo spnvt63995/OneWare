@@ -90,6 +90,7 @@
 
                 <Panel Grid.Row="1">
                     <DockPanel IsVisible="{Binding !IsBlocked}">
+                        <views:ChatNoticesView DockPanel.Dock="Top" DataContext="{Binding Notices}" Margin="10 4" />
                         <!-- Loading indicator + queued messages are pinned below the conversation and kept
                              outside the scrolling region so the virtualizing message list above can virtualize
                              against the viewport (it must be the direct content of the ScrollViewer). -->

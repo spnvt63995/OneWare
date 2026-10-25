@@ -431,10 +431,11 @@ public partial class ChatSessionViewModel : ObservableObject
     public ChatExecutionPlanViewModel ExecutionPlan { get; } = new();
     private long _planGeneration;
 
-    private void ClearExecutionPlan()
+    private void ClearConversationIndicators()
     {
         Interlocked.Increment(ref _planGeneration);
         ExecutionPlan.Clear();
+        ClearNotices();
     }
 
     /// <summary>
@@ -559,7 +560,7 @@ public partial class ChatSessionViewModel : ObservableObject
             return false;
         }
 
-        ClearExecutionPlan();
+        ClearConversationIndicators();
         Messages.Clear();
         _assistantMessagesById.Clear();
         _turnAssistantMessages.Clear();
@@ -590,7 +591,7 @@ public partial class ChatSessionViewModel : ObservableObject
         Title = DefaultTitle;
         _host.OnSessionChanged(this);
 
-        ClearExecutionPlan();
+        ClearConversationIndicators();
         Messages.Clear();
         QueuedMessages.Clear();
         _pendingLocalMessages.Clear();
@@ -1065,6 +1066,12 @@ public partial class ChatSessionViewModel : ObservableObject
     {
         switch (e)
         {
+            case ChatNoticesClearedEvent { AgentId: null }:
+                if (ReferenceEquals(Service, sender)) ClearNotices();
+                break;
+            case ChatNoticeEvent { AgentId: null } x:
+                ReceiveNotice(sender, x);
+                break;
             case ChatCompactionEvent { AgentId: null } x:
             {
                 var generation = Interlocked.Read(ref _planGeneration);
@@ -1370,7 +1377,7 @@ public partial class ChatSessionViewModel : ObservableObject
     {
         Dispatcher.UIThread.Post(() =>
         {
-            ClearExecutionPlan();
+            ClearConversationIndicators();
             // Keep the visible transcript: a session reset (e.g. after a CLI update or
             // re-login) starts a fresh backend session, but wiping the conversation from
             // the view is unnecessary. Only in-flight state tied to the old session is
@@ -1704,7 +1711,7 @@ public partial class ChatSessionViewModel : ObservableObject
 
     internal void LoadMessagesFromStates(IReadOnlyCollection<ChatMessageState> states)
     {
-        ClearExecutionPlan();
+        ClearConversationIndicators();
         Messages.Clear();
         _assistantMessagesById.Clear();
         _turnAssistantMessages.Clear();
@@ -1725,7 +1732,7 @@ public partial class ChatSessionViewModel : ObservableObject
     /// <summary>Drops the visible conversation, e.g. because the stored history of the service was discarded.</summary>
     internal void ClearTranscript()
     {
-        ClearExecutionPlan();
+        ClearConversationIndicators();
         Messages.Clear();
         _notConnectedMessage = null;
         _assistantMessagesById.Clear();
@@ -1744,7 +1751,7 @@ public partial class ChatSessionViewModel : ObservableObject
     /// <summary>Stops listening to the service when the chat is unloaded.</summary>
     internal void Detach()
     {
-        ClearExecutionPlan();
+        ClearConversationIndicators();
         Service.EventReceived -= OnEventReceived;
         Service.StatusChanged -= OnStatusChanged;
         Service.SessionReset -= OnSessionReset;

@@ -98,6 +98,7 @@ internal sealed partial class AcpChatService
             if (type == "chat-gpt" && _authKind == "account" &&
                 !string.IsNullOrEmpty(Text(result, "email")) &&
                 _accountDetails.Split(" · ")[0] == Text(result, "email")) return;
+            var previousIdentity = (_authKind, _accountDetails);
             _authKind = type switch
             {
                 "unauthenticated" => "none", "chat-gpt" => "account", "api-key" => "api_key",
@@ -110,6 +111,8 @@ internal sealed partial class AcpChatService
                 _ => "Account status has not been reported"
             };
             _accountDetails = Text(result, "email") ?? "";
+            if (previousIdentity != (_authKind, _accountDetails))
+                lock (_sync) ResetNotices();
             PublishAccount();
         });
     }
@@ -119,12 +122,15 @@ internal sealed partial class AcpChatService
         {
             if (!AccountConnectionCurrent(connection, generation)) return;
             Interlocked.Increment(ref _authRevision);
+            var previousIdentity = (_authKind, _accountDetails);
             _authKind = Text(status, "kind");
             _accountLabel = Text(status, "label") ?? "Account status has not been reported";
             _accountDetails = status.TryGetProperty("account", out var account)
                 ? string.Join(" · ", new[] { Text(account, "email"), Text(account, "plan") }
                     .Where(x => !string.IsNullOrWhiteSpace(x)))
                 : Text(status, "detail") ?? "";
+            if (previousIdentity != (_authKind, _accountDetails))
+                lock (_sync) ResetNotices();
             PublishAccount();
         });
 

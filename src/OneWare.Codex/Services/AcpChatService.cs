@@ -190,6 +190,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
                 ResetCommandsLocked();
                 InterruptCompactions();
                 _pendingCompactions = null;
+                ResetNotices();
                 _prompt?.Cancellation.Cancel();
             }
 
@@ -205,7 +206,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
             {
                 fs = new { readTextFile = false, writeTextFile = false }, terminal = false,
                 elicitation = new { form = new { } },
-                session = _delegation == null ? new { compaction = new { } } : (object)new { }
+                session = _delegation == null ? new { compaction = new { }, notices = new { } } : (object)new { }
             }
         }, token);
         if (!result.TryGetProperty("protocolVersion", out var version) || version.GetInt32() != 1)
@@ -320,6 +321,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         {
             _loaded = true;
             PublishPendingCompactions();
+            PublishPendingNotices();
         }
         await PublishOptionsAsync();
     }
@@ -382,6 +384,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         lock (_sync)
         {
             if (ObserveCommandCatalog(connection, generation, method, parameters)) return;
+            if (ObserveNotice(connection, generation, method, parameters)) return;
             if (ObserveCompaction(connection, generation, method, parameters)) return;
             if (!_disposed && ReferenceEquals(connection, _connection) && generation == _generation &&
                 method == "session/update" && Text(parameters, "sessionId") == _session &&
@@ -705,6 +708,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
             InterruptCompactions();
             _compactions.Clear();
             _pendingCompactions = null;
+            ResetNotices();
             _connection = null;
             _ready = false;
             _loaded = false;

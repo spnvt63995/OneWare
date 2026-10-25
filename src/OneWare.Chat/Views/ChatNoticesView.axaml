@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:OneWare.Chat.ViewModels"
+             x:Class="OneWare.Chat.Views.ChatNoticesView"
+             x:DataType="vm:ChatNoticesViewModel"
+             IsVisible="{Binding HasEntries, FallbackValue=False}">
+    <ScrollViewer MaxHeight="160" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding Entries}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ChatNoticeViewModel">
+                    <Border Classes="callout" Classes.warning="{Binding IsWarning}" Classes.error="{Binding IsError}" Margin="0 2">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource ThemeSpacingSmall}">
+                            <StackPanel Classes="section">
+                                <TextBlock Classes="caption" Text="{Binding SeverityText}" ToolTip.Tip="{Binding Notice.Severity}" />
+                                <TextBlock Classes="semibold" Text="{Binding Notice.Title}" TextWrapping="Wrap" />
+                                <SelectableTextBlock IsVisible="{Binding HasDescription}" Text="{Binding Notice.Description}"
+                                                     TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="icon" VerticalAlignment="Top" Command="{Binding DismissCommand}"
+                                    AutomationProperties.Name="{Binding DismissLabel}" ToolTip.Tip="Dismiss notice">
+                                <PathIcon Classes="small" Data="{StaticResource Icon.Close}" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </ScrollViewer>
+</UserControl>

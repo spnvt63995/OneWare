@@ -62,6 +62,14 @@ content notice. Missing summary fields retain earlier content, explicit replacem
 and clearing patches remove it. A stopped or disconnected run never implies successful compaction.
 Earlier chat messages remain available, and context usage changes only when the runtime reports usage.
 
+Live runtime notices appear above the conversation, with info, warning or error presentation and an
+individual dismiss button. Unknown severities use a generic notice style. The latest 20 distinct
+notices are kept; identical severity, title, description and metadata share one visible entry.
+Dismissal is local, and a later occurrence can appear again. Notices are cleared when their connection,
+conversation or account changes and are never stored in chat history. They do not stop a response,
+change approval or model choices, or trigger retries or sign-in. Compaction updates remain in their
+dedicated timeline card.
+
 ## Development entry points
 
 - `src/OneWare.Codex/CodexModule.cs`: provider and managed-runtime registration.
