@@ -53,7 +53,7 @@ public sealed class AcpCommandRecoveryTests
             Assert.Equal(second.Id, h.Profile.LoadRuntimeSession(id));
             Assert.Equal(selection, h.Profile.LoadSelection(id));
             Assert.Empty(second.Prompts);
-            Assert.Empty(events);
+            Assert.All(events, e => Assert.IsType<ChatNoticesClearedEvent>(e));
             Assert.Contains("saved messages were kept", reopened.CommandsStatus);
             await Status(reopened, second);
             Assert.Equal(second.Id, second.Prompts.Single().GetProperty("sessionId").GetString());

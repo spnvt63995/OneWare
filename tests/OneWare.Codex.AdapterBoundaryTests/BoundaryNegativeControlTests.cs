@@ -18,23 +18,4 @@ public sealed class BoundaryNegativeControlTests
         Assert.Equal(2, f.Invocations.Count);
         Assert.NotNull(Record.Exception(() => Assert.Single(f.Invocations)));
     }
-
-    [Fact]
-    public void Detects_F08_ReplacingSavedHistoryOnResume()
-    {
-        var f = new SessionFixture(replaceHistoryFault: true);
-        var original = f.History.ToArray();
-        ResumeContractTests.Load(f);
-        Assert.NotEqual(original[0], f.History[0]);
-        Assert.NotNull(Record.Exception(() => Assert.Equal(original, f.History)));
-    }
-
-    [Fact]
-    public void Detects_F10_ObservedValuesOverwritingInheritedIntent()
-    {
-        var f = new SessionFixture(replaceIntentFault: true);
-        ResumeContractTests.Load(f);
-        Assert.True(f.Saved.Model.Explicit);
-        Assert.NotNull(Record.Exception(() => Assert.False(f.Saved.Model.Explicit)));
-    }
 }

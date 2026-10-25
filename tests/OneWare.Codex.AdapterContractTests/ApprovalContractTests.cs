@@ -1,5 +1,5 @@
 using Xunit;
-using static OneWare.Codex.AdapterContractTests.ContractTestSupport;
+using static OneWare.Codex.AdapterContractTests.ApprovalTestSupport;
 
 namespace OneWare.Codex.AdapterContractTests;
 
@@ -19,7 +19,7 @@ public sealed class ApprovalContractTests
     [Trait("Contract", "F05")]
     public void F05_LateButtonAfterScopeEndsCannotExecuteOrGrant(string transition, string answer)
     {
-        var fixture = Fixture(approval: true);
+        var fixture = Fixture();
         var receipt = fixture.Request(Call());
         var decision = Assert.Single(fixture.PendingDecisions);
         switch (transition)
@@ -31,7 +31,7 @@ public sealed class ApprovalContractTests
             case "new-connection": fixture.Begin(Scope with { Connection = 2 }); break;
         }
         Assert.False(fixture.Resolve(decision, answer == "once" ? Answer.Once : Answer.Chat));
-        Assert.Equal(CallState.Rejected, receipt.State);
+        Assert.Equal(ApprovalState.Rejected, receipt.State);
         Assert.Empty(fixture.Invocations);
         Assert.Empty(fixture.PendingDecisions);
         Assert.Equal(0, fixture.ChatApprovalWrites);
@@ -43,7 +43,7 @@ public sealed class ApprovalContractTests
     [Trait("Contract", "F05")]
     public void F05_CompletedDecisionCannotBeUpgradedToAChatGrant(string firstAnswer)
     {
-        var fixture = Fixture(approval: true);
+        var fixture = Fixture();
         fixture.Request(Call());
         var decision = Assert.Single(fixture.PendingDecisions);
         Assert.True(fixture.Resolve(decision, firstAnswer == "deny" ? Answer.Deny : Answer.Once));
@@ -56,7 +56,7 @@ public sealed class ApprovalContractTests
     [Trait("Contract", "F05")]
     public void F05_OldDecisionCannotApproveANewCallWithTheSameCallId()
     {
-        var fixture = Fixture(approval: true);
+        var fixture = Fixture();
         fixture.Request(Call());
         var stale = Assert.Single(fixture.PendingDecisions);
         var nextOwner = Scope with { Connection = 2, Prompt = 2 };

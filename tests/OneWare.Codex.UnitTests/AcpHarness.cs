@@ -17,6 +17,7 @@ internal sealed class AcpHarness : IAsyncDisposable
     public List<ChatEvent> Events { get; } = [];
     public List<AiFunctionStartedEvent> Starts { get; } = [];
     public string Workspace { get; }
+    public string CurrentWorkspace { get; set; }
     public AcpProfile Profile { get; }
     private readonly bool _confirm;
     public ChatAgentDefinition? Agent { get; set; }
@@ -32,12 +33,13 @@ internal sealed class AcpHarness : IAsyncDisposable
             ? Path.Combine(Path.GetTempPath(), "oneware-acp-" + Guid.NewGuid().ToString("N"))
             : Path.Combine(profile.Directory, "verification-workspace");
         Directory.CreateDirectory(Workspace);
+        CurrentWorkspace = Workspace;
         Profile = profile ?? new AcpProfile("/unused/acp", "gpt-6-luna", "low", Path.Combine(Workspace, "profile"));
         var dock = InterfaceStub.Create<IMainDockService>((name, _) => name switch
         {
             "get_OpenFiles" => Documents, "get_CurrentDocument" => Document, _ => null
         });
-        var project = InterfaceStub.Create<IProjectRoot>((name, _) => name == "get_RootFolderPath" ? Workspace : null);
+        var project = InterfaceStub.Create<IProjectRoot>((name, _) => name == "get_RootFolderPath" ? CurrentWorkspace : null);
         var projects =
             InterfaceStub.Create<IProjectExplorerService>((name, _) => name == "get_ActiveProject" ? project : null);
         Provider = new AiFunctionProvider(projects, dock, InterfaceStub.Create<IErrorService>((_, _) => null),

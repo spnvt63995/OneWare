@@ -1,5 +1,5 @@
 using Xunit;
-using static OneWare.Codex.AdapterContractTests.ContractTestSupport;
+using static OneWare.Codex.AdapterContractTests.ApprovalTestSupport;
 
 namespace OneWare.Codex.AdapterContractTests;
 
@@ -11,7 +11,7 @@ public sealed class NegativeControlTests
     [Trait("Contract", "NegativeControl")]
     public void Detects_F05_StaleApprovalExecutionAndGrant()
     {
-        var fixture = Fixture(approval: true, fault: Fault.AcceptStaleDecision);
+        var fixture = Fixture(acceptStaleDecision: true);
         fixture.Request(Call());
         var decision = Assert.Single(fixture.PendingDecisions);
         fixture.End();
@@ -19,19 +19,5 @@ public sealed class NegativeControlTests
         Assert.Single(fixture.Invocations);
         Assert.Equal(1, fixture.ChatApprovalWrites);
         Assert.NotNull(Record.Exception(() => Assert.Equal(0, fixture.ChatApprovalWrites)));
-    }
-
-    [Fact]
-    [Trait("Contract", "NegativeControl")]
-    public void Detects_F09_ReplayReachingHistoryAndApproval()
-    {
-        var calls = Fixture(approval: true);
-        var replay = new ReplayFixture(Scope, ReplayContractTests.Saved, calls, Fault.ReplayAsLive);
-        var load = replay.BeginLoad();
-        replay.ObserveMessage(Scope, load, new("unmapped-replay", "assistant", "past output"));
-        replay.ObservePermission(Scope, load, Call());
-        Assert.Equal(1, replay.Writes);
-        Assert.Equal(1, calls.ApprovalRequests);
-        Assert.NotNull(Record.Exception(() => Assert.Equal(0, replay.Writes)));
     }
 }

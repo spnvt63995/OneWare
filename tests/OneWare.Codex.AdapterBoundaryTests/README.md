@@ -1,15 +1,13 @@
 # Adapter boundary fixtures
 
-This isolated .NET 10/xUnit project models F04, F08 and F10 from
+This isolated .NET 10/xUnit project models F04 from
 [the adapter contract](../../docs/CodexAdapterContract.md).
-There are **40 contract cases and 3 fault-injection controls**.
+There are **18 contract cases and 1 fault-injection control**.
 
 | Contract | Cases | Executed boundary |
 | --- | ---: | --- |
 | F04 | 18 | Fixed-owner approval decisions and grant matching with explicit approval-key inputs |
-| F08 | 10 | Same-ID resume, failed retry, foreign/stale response isolation and local history preservation |
-| F10 | 12 | Saved intent vs observed values; input identity, connection and prompt scope |
-| Negative controls | 3 | One injected violation per modeled contract is detected by the corresponding invariant |
+| Negative control | 1 | Accepting only one compound-command prefix is detected by the grant invariant |
 
 F04 command parsing and approval keys are tested against the product project in
 [`ToolApprovalTests`](../OneWare.Codex.UnitTests/ToolApprovalTests.cs). The fixed-owner model takes those
@@ -39,8 +37,18 @@ Queue/Steer option timing is tested against the real service in
 confirmed user model and reasoning, explicit agent overrides remain pinned, steering keeps the active
 turn's model, and subsequent tool requests use the live approval mode.
 [`AcpFeatureTests`](../OneWare.Codex.UnitTests/AcpFeatureTests.cs) covers queued content and agent
-snapshots, attachments, FIFO dispatch and steering ownership. The F10 model does not snapshot options
-or attachments.
+snapshots, attachments, FIFO dispatch and steering ownership.
+`AcpSessionBoundaryTests` checks workspace changes through the real service: steering is rejected,
+waiting input is not dispatched, and its attachments return to the draft for explicit resubmission.
+`AcpOptionsTests` covers persisted user/default/conversation selections; there is no independent
+explicit/inherited intent payload, review-required UI or controlled-connection bridge model.
+
+F08/F09 restoration and history are covered in `AcpSessionBoundaryTests`, `AcpAdapterTests`,
+`AcpCommandRecoveryTests` and `AcpAgentRestorationTests`. Ordinary conversations and children
+retain their runtime ID; only eligible command-only conversations may rebind after a confirmed
+missing-session response. Original workspace/profile bindings and saved messages are preserved.
+The product serializes session loading rather than comparing synthetic resume tickets or reply cwd.
+`AcpCompactionTests` covers the normal ID-addressed replay exception.
 
 F07 result encoding is tested against the product project in
 [`OneWareMcpResultTests`](../OneWare.Codex.UnitTests/OneWareMcpResultTests.cs), alongside
@@ -62,18 +70,16 @@ Use the .NET 10 SDK:
 dotnet test tests/OneWare.Codex.AdapterBoundaryTests/OneWare.Codex.AdapterBoundaryTests.csproj
 ```
 
-Use `--filter FullyQualifiedName~ClassName` to select a fixture class. The complementary ownership
-and replay cases are in `OneWare.Codex.AdapterContractTests`.
+Use `--filter FullyQualifiedName~ClassName` to select a fixture class. Complementary pending-decision
+models are in `OneWare.Codex.AdapterContractTests`; transport regressions are in `OneWare.Codex.UnitTests`.
 
 ## Evidence limits
 
 No product source or project is linked into this test assembly. No
 Studio process, model, CLI, MCP HTTP server, real profile or conversation is launched.
-F04's fixed-owner decisions and F08/F10 are bounded contract models, not the running product service.
+F04's fixed-owner decisions are bounded contract models, not the running product service.
 The fault controls measure oracle sensitivity, not reproduced product defects. These fixtures alone
 do not establish runtime ACP compatibility.
 
-F10's explicit/inherited intent, review-required outcomes and controlled-refresh bridge remain isolated
-model conditions. They do not establish support for every inheritance or scope combination, a product
-review UI, or equivalent transport recovery. Current ACP selection and queue behavior must be verified
-against the product tests above. Do not change product behavior to match an older model.
+The product tests above do not establish every malformed reply, concurrency race or inheritance
+combination from the original models. Do not change product behavior to match an older model.

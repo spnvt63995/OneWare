@@ -13,13 +13,13 @@ Passing a fixture does not establish equivalent behavior in the running ACP tran
 | F05 | Ignore late approval decisions after their owner ends; do not execute or create a grant. |
 | F06 | Keep tool rows, completion and edit review attached to the owning session and invocation. |
 | F07 | Preserve supported result block order, images, errors and explicit unsupported-content behavior. |
-| F08 | Resume the same session; retain history on failure and reject stale or foreign responses. |
-| F09 | Quarantine replay so loading history cannot invoke tools, request approval or duplicate saved messages. |
-| F10 | Separate saved model/reasoning intent from observed values and check queued/steered input ownership. |
+| F08 | Restore an owned conversation and its local history; distinguish eligible command-only recovery. |
+| F09 | Suppress ordinary replay messages, tools and approvals while allowing supported ID-addressed updates. |
+| F10 | Persist current selections, preserve queued content and enforce active steering ownership. |
 | F11 | Rebind unchanged tool handlers and refresh local descriptors at a safe prompt boundary. |
 
-`tests/OneWare.Codex.AdapterContractTests` models F05 and F09 with synthetic scope labels,
-decision handles, effect recording and fault-injection controls. These labels are not ACP wire messages.
+`tests/OneWare.Codex.AdapterContractTests` models F05 with synthetic scope labels,
+decision handles, effect recording and a fault-injection control. These labels are not ACP wire messages.
 
 F01–F03 are covered at the product boundary by `AcpAdapterTests`, `AcpToolMatchingTests`,
 `AcpParallelSessionTests` and `McpBoundaryTests`. Both arrival orders wait for a matching pair before
@@ -39,7 +39,7 @@ These product tests do not exhaust every malformed envelope or every connection/
 F05's model records accepted decision effects only; it does not store or expire conversation grants.
 An expired pending decision and an already accepted chat approval have different lifetimes.
 
-`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F08 and F10 without compiling product
+`tests/OneWare.Codex.AdapterBoundaryTests` models F04 without compiling product
 source. Its fixed-owner approval decisions take explicit approval keys; the product parser is covered in
 `tests/OneWare.Codex.UnitTests/ToolApprovalTests.cs`. Conversation approval persistence and isolation are
 covered against the real service in `tests/OneWare.Codex.UnitTests/AcpApprovalMemoryTests.cs`.
@@ -56,12 +56,29 @@ or a universal at-most-once UI completion guarantee.
 The fixture projects target .NET 10 and use xUnit. Their READMEs describe execution and coverage.
 Integration claims require separate checks of the actual transport and UI implementation.
 
-The original models are not a complete specification of the current product. F10 models saved intent
-and input ownership independently; it does not freeze options or attachments. Product tests
-`AcpLiveApprovalTests`, `AcpLiveModelTests` and `AcpFeatureTests` cover live approval, next-message model
-selection, queued content/agent snapshots and steering ownership. The model's explicit/inherited
-combinations, review-required outcomes and controlled-refresh bridge do not establish equivalent
-product support.
+F08 uses local profile/workspace bindings and serialized session loading. `AcpSessionBoundaryTests`
+checks failed transport, wrong returned session ID and changed local workspace without losing the
+original messages or replacing the conversation. `AcpCommandRecoveryTests` covers the limited
+exception: an eligible command-only parent conversation may rebind its runtime ID after a confirmed
+missing-session error while preserving the local history key. Ordinary dispatched conversations and
+children must resume their existing runtime session; `AcpAgentRestorationTests` covers the child path.
+There is no independent resume-ticket generation model or reply-cwd contract.
+
+F09 is covered through the actual Chat host, saved transcript and ACP/MCP boundary in
+`AcpSessionBoundaryTests` and `AcpAdapterTests`. Ordinary replay does not append messages or invoke
+tools/permissions during loading; a later live turn with identical text remains a separate message.
+Transient notices and ID-addressed compaction updates are valid exceptions, with saved compaction
+cards tested by `AcpCompactionTests`. There is no synthetic load-origin tag or replay-message-ID
+validator. These tests do not claim to distinguish arbitrarily delayed replay from live output once
+a new prompt is active, nor do they introduce a runtime extension for that purpose.
+
+F10's current selection persistence is covered by `AcpOptionsTests`. `AcpLiveApprovalTests`,
+`AcpLiveModelTests` and `AcpFeatureTests` cover live approval, next-message model selection,
+queued content/agent snapshots, FIFO dispatch and steering ownership. `AcpToolRefreshTests`
+checks queued work after a tool refresh; `AcpSessionBoundaryTests` checks rejection and attachment
+restoration after a workspace change. Abort/disconnect clears waiting input. These are the actual
+selection and submission paths, without an independent inherit payload, ReviewRequired list or
+controlled-connection bridge. The tests do not exhaust every selection combination or lifecycle race.
 
 F11 is covered against the product by `McpBoundaryTests` and `AcpToolRefreshTests`. Local catalog
 comparison, publication and session refresh do not confirm a backend readback of every descriptor.
