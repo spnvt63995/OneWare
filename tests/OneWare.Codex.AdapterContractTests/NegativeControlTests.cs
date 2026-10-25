@@ -53,8 +53,8 @@ public sealed class NegativeControlTests
         fixture.End();
         Assert.True(fixture.Resolve(decision, Answer.Chat));
         Assert.Single(fixture.Invocations);
-        Assert.Equal(1, fixture.GrantCount);
-        Assert.NotNull(Record.Exception(() => Assert.Equal(0, fixture.GrantCount)));
+        Assert.Equal(1, fixture.ChatApprovalWrites);
+        Assert.NotNull(Record.Exception(() => Assert.Equal(0, fixture.ChatApprovalWrites)));
     }
 
     [Fact]

@@ -167,6 +167,80 @@ public sealed class AcpToolDetailsTests
     }
 
     [AvaloniaFact]
+    public async Task HostProgressAndCompletionStayWithTheirConversationWhileAnotherChatIsSelected()
+    {
+        var peers = new List<AcpPeer>();
+        await using var h = new AcpHarness(factory: () => { var p = new AcpPeer(); peers.Add(p); return p; });
+        var entered = new TaskCompletionSource<AiFunctionInvocationContext>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var result = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        h.Provider.RegisterFunction(new OneWareAiFunction
+        {
+            Name = "native_progress", Description = "Controlled host progress", IsReadOnly = true,
+            Handler = (Func<string, string>)(value => value),
+            InvocationHandler = (context, _, token) =>
+            {
+                entered.TrySetResult(context);
+                return new ValueTask<object?>(result.Task.WaitAsync(token));
+            }
+        });
+        var (chat, a) = Host(h);
+        await AcpHarness.Until(() => a.IsConnected);
+        a.CurrentMessage = "Host progress in A";
+        var first = a.SendCommand.ExecuteAsync(null);
+        await Ready(peers, 1);
+        var call = peers[0].CallTool("same-call", "native_progress", new { value = "A" });
+        var context = await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        Dispatcher.UIThread.RunJobs();
+        var start = Assert.Single(h.Starts);
+        var rowA = Assert.Single(a.Messages.OfType<ChatMessageToolViewModel>());
+        Assert.Equal(peers[0].Id, start.SessionId);
+        Assert.Equal("same-call", start.ToolCallId);
+        Assert.Equal(start.Id, rowA.Id);
+        Assert.Equal(start.ToolCallId, rowA.SourceToolCallId);
+
+        var b = chat.OpenNewChat()!;
+        await AcpHarness.Until(() => b.IsConnected);
+        b.CurrentMessage = "Host progress in B";
+        var second = b.SendCommand.ExecuteAsync(null);
+        await Ready(peers, 2);
+        Assert.False((await peers[1].CallTool("same-call", "acp_fixture", new { value = "B" }))
+            .GetProperty("isError").GetBoolean());
+        Dispatcher.UIThread.RunJobs();
+        var rowB = Assert.Single(b.Messages.OfType<ChatMessageToolViewModel>());
+        var outputB = rowB.ToolOutput;
+        Assert.Same(b, chat.CurrentSession);
+
+        context.ReportProgress("Progress from A");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Progress from A", rowA.ToolOutput);
+        peers[0].Tool("same-call", "native_progress", "A");
+        peers[0].Update(new { sessionUpdate = "tool_call_update", toolCallId = "same-call", status = "in_progress", rawOutput = "Backend progress" });
+        peers[0].Update(new { sessionUpdate = "tool_call_update", toolCallId = "same-call", status = "completed", rawOutput = "Backend completion" });
+        Dispatcher.UIThread.RunJobs();
+        Assert.Same(rowA, Assert.Single(a.Messages.OfType<ChatMessageToolViewModel>()));
+        Assert.True(rowA.IsToolRunning);
+        Assert.Equal("Progress from A", rowA.ToolOutput);
+        Assert.Equal(2, h.Starts.Count);
+
+        result.SetResult("Original host result");
+        var response = await call.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(response.GetProperty("isError").GetBoolean());
+        Assert.Contains("Original host result", response.GetProperty("content")[0].GetProperty("text").GetString());
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(rowA.IsToolRunning);
+        Assert.True(rowA.IsSuccessful);
+        context.ReportProgress("Late progress from A");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Progress from A", rowA.ToolOutput);
+        Assert.Same(rowB, Assert.Single(b.Messages.OfType<ChatMessageToolViewModel>()));
+        Assert.Equal(outputB, rowB.ToolOutput);
+        Assert.True(rowB.IsSuccessful);
+        peers[0].Complete();
+        peers[1].Complete();
+        await Task.WhenAll(first, second);
+    }
+
+    [AvaloniaFact]
     public async Task CancellationRejectsLateToolProgress()
     {
         await using var h = new AcpHarness();

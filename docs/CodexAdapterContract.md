@@ -21,13 +21,23 @@ Passing a fixture does not establish equivalent behavior in the running ACP tran
 `tests/OneWare.Codex.AdapterContractTests` covers F01–F03, F05 and F09 with in-memory envelopes,
 logical clocks and fault-injection controls. These envelopes are not ACP wire messages.
 
-`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F06, F08 and F10 without compiling product
+F05's model records accepted decision effects only; it does not store or expire conversation grants.
+An expired pending decision and an already accepted chat approval have different lifetimes.
+
+`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F08 and F10 without compiling product
 source. Its fixed-owner approval decisions take explicit approval keys; the product parser is covered in
 `tests/OneWare.Codex.UnitTests/ToolApprovalTests.cs`. Conversation approval persistence and isolation are
 covered against the real service in `tests/OneWare.Codex.UnitTests/AcpApprovalMemoryTests.cs`.
 F07 is also covered against the product
 project in `tests/OneWare.Codex.UnitTests/OneWareMcpResultTests.cs`. In-memory
-at-most-once behavior is not a durable crash-recovery ledger, and fixture edit review is not native UI.
+at-most-once behavior is not a durable crash-recovery ledger.
+
+F06 host invocation IDs and row progress/completion are covered by product tests in `AcpAdapterTests`
+and `AcpToolDetailsTests`, including completion in the original chat while another is selected and
+separate handling of host backend notifications and runtime tools. There is no independent presentation
+or edit-review model. Shared `AiFileEditService` writes edits immediately; Accept closes review and Undo
+restores the original when allowed. The display tests do not establish end-to-end editor review coverage
+or a universal at-most-once UI completion guarantee.
 
 The fixture projects target .NET 10 and use xUnit. Their READMEs describe execution and coverage.
 Integration claims require separate checks of the actual transport and UI implementation.

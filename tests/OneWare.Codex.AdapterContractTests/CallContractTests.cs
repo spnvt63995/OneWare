@@ -71,7 +71,7 @@ public sealed class CallContractTests
         Assert.Equal(1, fixture.ApprovalRequests);
         Assert.True(fixture.Resolve(Assert.Single(fixture.PendingDecisions), Answer.Once));
         Assert.Single(fixture.Invocations);
-        Assert.Equal(0, fixture.GrantCount);
+        Assert.Equal(0, fixture.ChatApprovalWrites);
     }
 
     [Theory]
@@ -223,7 +223,7 @@ public sealed class CallContractTests
         Assert.False(fixture.Resolve(decision, Answer.Chat));
         Assert.Equal(CallState.Rejected, receipt.State);
         Assert.Empty(fixture.Invocations);
-        Assert.Equal(0, fixture.GrantCount);
+        Assert.Equal(0, fixture.ChatApprovalWrites);
     }
 
     [Theory]
@@ -249,7 +249,7 @@ public sealed class CallContractTests
         Assert.Equal(previousState, first.State);
         if (phase == "pending") fixture.Notice(call);
         Assert.Single(fixture.Invocations);
-        Assert.Equal(0, fixture.GrantCount);
+        Assert.Equal(0, fixture.ChatApprovalWrites);
     }
 
     [Fact]
@@ -301,6 +301,6 @@ public sealed class CallContractTests
     {
         Assert.Empty(fixture.Invocations);
         Assert.Equal(0, fixture.ApprovalRequests);
-        Assert.Equal(0, fixture.GrantCount);
+        Assert.Equal(0, fixture.ChatApprovalWrites);
     }
 }

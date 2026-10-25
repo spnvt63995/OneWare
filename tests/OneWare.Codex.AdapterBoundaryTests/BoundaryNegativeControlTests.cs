@@ -20,19 +20,6 @@ public sealed class BoundaryNegativeControlTests
     }
 
     [Fact]
-    public void Detects_F06_LateCompletionRoutedToTheCurrentRow()
-    {
-        var f = new PresentationFixture(routeToSelectedFault: true);
-        var old = BoundaryData.Call();
-        var oldRow = f.Invoke(old);
-        var next = f.Invoke(old with { Owner = old.Owner with { Prompt = 2 } });
-        f.Complete(old, false);
-        Assert.Equal(1, next.Completions);
-        Assert.Equal(0, oldRow.Completions);
-        Assert.NotNull(Record.Exception(() => Assert.Equal(0, next.Completions)));
-    }
-
-    [Fact]
     public void Detects_F08_ReplacingSavedHistoryOnResume()
     {
         var f = new SessionFixture(replaceHistoryFault: true);

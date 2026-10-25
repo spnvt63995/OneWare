@@ -35,7 +35,7 @@ public sealed class ApprovalContractTests
         Assert.Equal(CallState.Rejected, receipt.State);
         Assert.Empty(fixture.Invocations);
         Assert.Empty(fixture.PendingDecisions);
-        Assert.Equal(0, fixture.GrantCount);
+        Assert.Equal(0, fixture.ChatApprovalWrites);
     }
 
     [Theory]
@@ -51,7 +51,7 @@ public sealed class ApprovalContractTests
         Assert.True(fixture.Resolve(decision, firstAnswer == "deny" ? Answer.Deny : Answer.Once));
         Assert.False(fixture.Resolve(decision, Answer.Chat));
         Assert.Equal(firstAnswer == "deny" ? 0 : 1, fixture.Invocations.Length);
-        Assert.Equal(0, fixture.GrantCount);
+        Assert.Equal(0, fixture.ChatApprovalWrites);
     }
 
     [Fact]
@@ -71,29 +71,9 @@ public sealed class ApprovalContractTests
         Assert.NotEqual(stale, current);
         Assert.False(fixture.Resolve(stale, Answer.Chat));
         Assert.Empty(fixture.Invocations);
-        Assert.Equal(0, fixture.GrantCount);
+        Assert.Equal(0, fixture.ChatApprovalWrites);
         Assert.True(fixture.Resolve(current, Answer.Once));
         Assert.Single(fixture.Invocations);
-        Assert.Equal(0, fixture.GrantCount);
-    }
-
-    [Fact]
-    [Trait("Contract", "F05")]
-    public void F05_CurrentDecisionCanGrantWithinItsScopeAndEndClearsIt()
-    {
-        var fixture = Fixture(approval: true);
-        fixture.Notice(Call());
-        fixture.Request("rpc-a", Call());
-        Assert.True(fixture.Resolve(Assert.Single(fixture.PendingDecisions), Answer.Chat));
-        Assert.Single(fixture.Invocations);
-        Assert.Equal(1, fixture.GrantCount);
-        fixture.Finish(Call());
-        var next = Call("call-b");
-        fixture.Notice(next);
-        fixture.Request("rpc-b", next);
-        Assert.Equal(2, fixture.Invocations.Length);
-        Assert.Equal(1, fixture.ApprovalRequests);
-        fixture.End();
-        Assert.Equal(0, fixture.GrantCount);
+        Assert.Equal(0, fixture.ChatApprovalWrites);
     }
 }

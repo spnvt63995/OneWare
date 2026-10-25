@@ -38,16 +38,17 @@ internal sealed class ContractFixture(bool confirmationRequired = false, Fault f
     private readonly Dictionary<(Owner, string), Slot> _calls = [];
     private readonly HashSet<(string, string, int, string)> _rpcIds = [];
     private readonly Dictionary<string, Slot> _decisions = [];
-    private readonly HashSet<string> _grants = [];
     private readonly List<Invocation> _invocations = [];
     private Owner? _active;
     private long _clock;
     private long _decisionSequence;
     private int _approvalRequests;
+    private int _chatApprovalWrites;
 
     public Invocation[] Invocations { get { lock (_sync) return _invocations.ToArray(); } }
     public int ApprovalRequests { get { lock (_sync) return _approvalRequests; } }
-    public int GrantCount { get { lock (_sync) return _grants.Count; } }
+    // Records accepted decision effects, not stored grants or their conversation lifetime.
+    public int ChatApprovalWrites { get { lock (_sync) return _chatApprovalWrites; } }
     public string[] PendingDecisions
     {
         get { lock (_sync) return _decisions.Where(x => x.Value.State == CallState.Approval).Select(x => x.Key).ToArray(); }
@@ -67,7 +68,6 @@ internal sealed class ContractFixture(bool confirmationRequired = false, Fault f
         lock (_sync)
         {
             _active = null;
-            _grants.Clear();
             foreach (var slot in _calls.Values.Where(x => x.State is CallState.Waiting or CallState.Approval or CallState.Executing))
                 Reject(slot, "scope-ended");
         }
@@ -128,7 +128,7 @@ internal sealed class ContractFixture(bool confirmationRequired = false, Fault f
         if (!Current(request.Owner)) { Reject(slot, "owner-changed"); return; }
         if (slot.Notice == null && fault != Fault.RunBeforeMatch) return;
         if (slot.Notice is { } notice && !Same(notice, request)) { Reject(slot, "call-mismatch"); return; }
-        if (confirmationRequired && !_grants.Contains(request.Tool))
+        if (confirmationRequired)
         {
             SetState(slot, CallState.Approval);
             slot.Decision = $"decision-{++_decisionSequence}";
@@ -146,7 +146,7 @@ internal sealed class ContractFixture(bool confirmationRequired = false, Fault f
             if ((slot.State != CallState.Approval || !Current(slot.Request.Owner)) && fault != Fault.AcceptStaleDecision)
                 return false;
             if (answer == Answer.Deny) { Reject(slot, "denied"); return true; }
-            if (answer == Answer.Chat) _grants.Add(slot.Request.Tool);
+            if (answer == Answer.Chat) _chatApprovalWrites++;
             Execute(slot);
             return true;
         }
