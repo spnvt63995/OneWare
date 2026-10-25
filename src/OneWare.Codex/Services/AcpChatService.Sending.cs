@@ -275,10 +275,13 @@ internal sealed partial class AcpChatService
                         throw new IOException("ACP prompt stopped: " + Text(reply, "stopReason"));
                     if (turn.Text.Length > 0)
                         Emit(new ChatMessageEvent(turn.Text.ToString(), turn.MessageId) { Model = input.Model });
-                    else if (input.Command is { } completed)
-                        Emit(new ChatMessageEvent(completed.Name == "mcp"
-                            ? "The MCP command returned no status. Run /mcp to check the servers."
-                            : "/" + completed.Name + " completed.", turn.MessageId));
+                    else if (input.Command is { } completed && !(completed.Name == "compact" && turn.HasCompaction))
+                        Emit(new ChatMessageEvent(completed.Name switch
+                        {
+                            "mcp" => "The MCP command returned no status. Run /mcp to check the servers.",
+                            "compact" => "The compaction command returned no status.",
+                            _ => "/" + completed.Name + " completed."
+                        }, turn.MessageId));
                     planState = ChatPlanRunState.Finished;
                 }
                 catch (OperationCanceledException)
@@ -292,6 +295,7 @@ internal sealed partial class AcpChatService
                     {
                         turn.Finished = true;
                         PublishExecutionPlan(turn, planState);
+                        InterruptCompactions();
                         turn.Cancellation.Cancel();
                         if (ReferenceEquals(_prompt, turn)) _prompt = null;
                     }

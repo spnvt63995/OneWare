@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:messages="clr-namespace:OneWare.Chat.ViewModels.ChatMessages"
+             xmlns:controls="clr-namespace:OneWare.Essentials.Controls;assembly=OneWare.Essentials"
+             x:Class="OneWare.Chat.Views.ChatMessages.ChatMessageCompactionView"
+             x:DataType="messages:ChatMessageCompactionViewModel">
+    <Border Classes="card compact">
+        <StackPanel Spacing="4">
+            <TextBlock Classes="semibold" Text="Context compaction" />
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4">
+                <controls:Spinner Width="12" Height="12" IsVisible="{Binding IsInProgress}" />
+                <TextBlock Grid.Column="1" Classes="muted" Text="{Binding StatusText}" TextWrapping="Wrap" />
+            </Grid>
+            <SelectableTextBlock Classes="error" IsVisible="{Binding HasError}" Text="{Binding Error}" TextWrapping="Wrap" />
+            <Expander Name="SummaryExpander" Header="Retained summary" IsVisible="{Binding HasSummary}"
+                      IsExpanded="{Binding IsExpanded, Mode=TwoWay}">
+                <StackPanel Spacing="4">
+                    <controls:MarkdownViewer Markdown="{Binding SummaryText}" SelectionEnabled="True" MaxHeight="320" />
+                    <TextBlock Classes="caption" IsVisible="{Binding HasOtherContent}" TextWrapping="Wrap"
+                               Text="The summary also contains content that cannot be displayed here." />
+                </StackPanel>
+            </Expander>
+        </StackPanel>
+    </Border>
+</UserControl>

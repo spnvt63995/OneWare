@@ -347,6 +347,7 @@ internal sealed class AcpPeer : IAgentConnection
     private TaskCompletionSource<JsonElement> _response = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private JsonElement _mcp;
     public bool ReplayOnResume { get; set; }
+    public object[]? SessionUpdates { get; set; }
     public object[]? AdvertisedCommands { get; set; }
     public bool SupportsResume { get; set; } = true;
     public string? LastResumeMethod { get; private set; }
@@ -438,6 +439,8 @@ internal sealed class AcpPeer : IAgentConnection
             }
 
             _mcp = p.GetProperty("mcpServers")[0].Clone();
+            if (SessionUpdates != null)
+                foreach (var update in SessionUpdates) Update(update);
             if (AdvertisedCommands != null)
                 Update(new { sessionUpdate = "available_commands_update", availableCommands = AdvertisedCommands });
             return Json(new { sessionId = Id, configOptions = Config() });

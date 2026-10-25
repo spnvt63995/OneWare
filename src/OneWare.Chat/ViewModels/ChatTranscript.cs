@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using OneWare.Chat.ViewModels.ChatMessages;
+using OneWare.Essentials.Models;
 
 namespace OneWare.Chat.ViewModels;
 
@@ -10,6 +11,8 @@ internal static class ChatTranscript
     {
         switch (message)
         {
+            case ChatMessageCompactionViewModel compaction:
+                return new ChatMessageState(ChatMessageKind.Compaction) { Compaction = compaction.State };
             case ChatMessageUserViewModel user:
                 return new ChatMessageState(ChatMessageKind.User)
                 {
@@ -65,6 +68,12 @@ internal static class ChatTranscript
     {
         switch (state.Kind)
         {
+            case ChatMessageKind.Compaction when state.Compaction is { } compaction:
+                message = new ChatMessageCompactionViewModel(compaction with
+                {
+                    IsInterrupted = compaction.IsInterrupted || compaction.Status == "in_progress"
+                });
+                return true;
             case ChatMessageKind.User:
                 message = new ChatMessageUserViewModel(state.Message ?? string.Empty);
                 return true;
@@ -185,6 +194,7 @@ internal sealed class ChatMessageState
     /// <summary>Whether the message is the one that ended its turn and therefore names its model.</summary>
     public bool ShowModel { get; set; }
     public bool IsSuccessful { get; set; }
+    public ChatCompactionState? Compaction { get; set; }
 
     /// <summary>Messages nested inside a sub-agent block.</summary>
     public List<ChatMessageState> Children { get; set; } = [];
@@ -197,5 +207,6 @@ internal enum ChatMessageKind
     Reasoning,
     Tool,
     Skill,
-    SubAgent
+    SubAgent,
+    Compaction
 }

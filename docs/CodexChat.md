@@ -54,6 +54,14 @@ decision to start implementation or update the proposed plan.
 The managed ACP runtime still uses Codex CLI internally. Its internal App Server process is required
 by that runtime; it is separate from the retired direct App Server provider.
 
+Automatic context compaction and `/compact` share a **Context compaction** card in the parent
+conversation. Updates keep the card in its original position, including after reopening the chat.
+The card shows the reported state and error, with a collapsible **Retained summary** only when the
+runtime supplies one. Text summaries support Markdown; other content is retained with an unsupported
+content notice. Missing summary fields retain earlier content, explicit replacements overwrite it,
+and clearing patches remove it. A stopped or disconnected run never implies successful compaction.
+Earlier chat messages remain available, and context usage changes only when the runtime reports usage.
+
 ## Development entry points
 
 - `src/OneWare.Codex/CodexModule.cs`: provider and managed-runtime registration.

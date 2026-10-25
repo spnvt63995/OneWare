@@ -91,7 +91,8 @@ public sealed class AcpCommandTests
         Assert.Single(h.Events.OfType<ChatTurnStartedEvent>());
         h.Peer.CompleteSilently();
         await send;
-        Assert.Single(h.Events.OfType<ChatMessageEvent>());
+        var result = Assert.Single(h.Events.OfType<ChatMessageEvent>());
+        if (command == "/compact") Assert.Equal("The compaction command returned no status.", result.Content);
         Assert.Single(h.Events.OfType<ChatIdleEvent>());
         Assert.Empty(h.Events.OfType<ChatErrorEvent>());
     }

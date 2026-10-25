@@ -1065,6 +1065,25 @@ public partial class ChatSessionViewModel : ObservableObject
     {
         switch (e)
         {
+            case ChatCompactionEvent { AgentId: null } x:
+            {
+                var generation = Interlocked.Read(ref _planGeneration);
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (generation != Interlocked.Read(ref _planGeneration) || !ReferenceEquals(Service, sender) ||
+                        CurrentSessionId != x.SessionId) return;
+                    var message = Messages.OfType<ChatMessageCompactionViewModel>().FirstOrDefault(m =>
+                        m.State.SessionId == x.SessionId && m.State.Id == x.CompactionId);
+                    if (message == null)
+                    {
+                        message = new ChatMessageCompactionViewModel(new ChatCompactionState(x.SessionId, x.CompactionId));
+                        AddMessage(message);
+                    }
+                    message.Apply(x);
+                    NotifyContentAdded();
+                });
+                break;
+            }
             case ChatExecutionPlanEvent { AgentId: null } x:
             {
                 var generation = Interlocked.Read(ref _planGeneration);
@@ -1695,8 +1714,11 @@ public partial class ChatSessionViewModel : ObservableObject
 
         foreach (var messageState in states)
         {
-            if (ChatTranscript.TryCreateMessage(messageState, out var message))
-                Messages.Add(message);
+            if (!ChatTranscript.TryCreateMessage(messageState, out var message)) continue;
+            if (message is ChatMessageCompactionViewModel compaction &&
+                Messages.OfType<ChatMessageCompactionViewModel>().Any(m =>
+                    m.State.SessionId == compaction.State.SessionId && m.State.Id == compaction.State.Id)) continue;
+            Messages.Add(message);
         }
     }
 

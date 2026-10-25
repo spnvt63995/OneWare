@@ -88,6 +88,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         public bool Started { get; set; }
         public bool UsageRecorded { get; set; }
         public bool RestartRequired { get; set; }
+        public bool HasCompaction { get; set; }
         public Prepared? Input { get; set; }
 
         public bool Allows(OneWareTool tool) => (!ReadOnly || tool.IsReadOnly) &&
@@ -187,6 +188,8 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
                 _ready = false;
                 _loaded = false;
                 ResetCommandsLocked();
+                InterruptCompactions();
+                _pendingCompactions = null;
                 _prompt?.Cancellation.Cancel();
             }
 
@@ -201,7 +204,8 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
             clientCapabilities = new
             {
                 fs = new { readTextFile = false, writeTextFile = false }, terminal = false,
-                elicitation = new { form = new { } }
+                elicitation = new { form = new { } },
+                session = _delegation == null ? new { compaction = new { } } : (object)new { }
             }
         }, token);
         if (!result.TryGetProperty("protocolVersion", out var version) || version.GetInt32() != 1)
@@ -305,14 +309,18 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
             if (!resume && (!_capabilities.TryGetProperty("loadSession", out var load) ||
                             load.ValueKind != JsonValueKind.True))
                 throw new IOException("This ACP agent cannot resume the existing session.");
-            // No active Prompt exists during resume/load: replay cannot execute tools or append history.
+            // Replay cannot execute tools or append ordinary messages. ID-addressed compactions patch history.
             reply = await ResumeSessionAsync(resume ? "session/resume" : "session/load", servers, token);
             if (Text(reply, "sessionId") is { } echoed && echoed != _session)
                 throw new IOException("ACP returned a different session.");
         }
 
         _config = reply.TryGetProperty("configOptions", out var config) ? config.Clone() : default;
-        _loaded = true;
+        lock (_sync)
+        {
+            _loaded = true;
+            PublishPendingCompactions();
+        }
         await PublishOptionsAsync();
     }
 
@@ -374,6 +382,7 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         lock (_sync)
         {
             if (ObserveCommandCatalog(connection, generation, method, parameters)) return;
+            if (ObserveCompaction(connection, generation, method, parameters)) return;
             if (!_disposed && ReferenceEquals(connection, _connection) && generation == _generation &&
                 method == "session/update" && Text(parameters, "sessionId") == _session &&
                 parameters.TryGetProperty("update", out var optionUpdate) &&
@@ -693,6 +702,9 @@ internal sealed partial class AcpChatService : ObservableObject, IChatServiceWit
         var connection = _connection;
         lock (_sync)
         {
+            InterruptCompactions();
+            _compactions.Clear();
+            _pendingCompactions = null;
             _connection = null;
             _ready = false;
             _loaded = false;
