@@ -3,7 +3,6 @@ using System.Text.Json;
 using CommunityToolkit.Mvvm.Input;
 using OneWare.Codex.Protocol;
 using OneWare.Essentials.Models;
-using OneWare.Essentials.Services;
 
 namespace OneWare.Codex.Services;
 
