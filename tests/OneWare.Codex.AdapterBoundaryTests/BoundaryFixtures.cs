@@ -34,23 +34,16 @@ internal sealed class PermissionAttempt(FunctionSpec function, BoundaryInvocatio
 internal sealed class PermissionFixture(bool anyPrefixFault = false)
 {
     private readonly HashSet<string> _grants = [];
-    public BoundaryOwner Current { get; private set; } = BoundaryData.Owner;
     public int ApprovalRequests { get; private set; }
     public int GrantCount => _grants.Count;
     public List<BoundaryInvocation> Invocations { get; } = [];
 
-    public void Transition(BoundaryOwner owner, bool controlledRefresh = false)
-    {
-        if (!controlledRefresh || owner.Provider != Current.Provider || owner.Profile != Current.Profile ||
-            owner.Session != Current.Session || owner.Directory != Current.Directory) _grants.Clear();
-        Current = owner;
-    }
-    // Product parser tests verify key extraction; lifecycle probes supply the resulting keys explicitly.
+    // Fixed-owner decision probes take explicit keys; product tests cover parsing and conversation lifetime.
     public PermissionAttempt Request(FunctionSpec function, BoundaryInvocation call, string[]? approvalKeys, bool policyAllows = true)
     {
         var keys = approvalKeys?.ToArray();
         var attempt = new PermissionAttempt(function, call with { Arguments = call.Arguments.Clone() }, keys);
-        if (!policyAllows || call.Owner != Current || function.Name != call.Tool)
+        if (!policyAllows || call.Owner != BoundaryData.Owner || function.Name != call.Tool)
         {
             attempt.State = "denied";
             return attempt;
@@ -64,7 +57,7 @@ internal sealed class PermissionFixture(bool anyPrefixFault = false)
     }
     public bool Resolve(PermissionAttempt attempt, PermissionAnswer answer)
     {
-        if (attempt.State != "pending" || attempt.Call.Owner != Current) return false;
+        if (attempt.State != "pending" || attempt.Call.Owner != BoundaryData.Owner) return false;
         if (answer == PermissionAnswer.Deny) { attempt.State = "denied"; return true; }
         if (answer == PermissionAnswer.Chat)
         {

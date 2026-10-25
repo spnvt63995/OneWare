@@ -99,32 +99,6 @@ public sealed class PermissionScopeTests
         Assert.Equal("pending", f.Request(Terminal, Command(command, "b"), null).State);
     }
 
-    [Theory]
-    [InlineData("new-chat")]
-    [InlineData("load")]
-    [InlineData("reconnect")]
-    [InlineData("controlled-foreign-session")]
-    public void F04_GrantsResetOutsideTheSameSessionControlledRefresh(string transition)
-    {
-        var f = new PermissionFixture();
-        f.Resolve(f.Request(Terminal, Command("git status"), [StatusKey]), PermissionAnswer.Chat);
-        var owner = BoundaryData.Owner with { Connection = 2 };
-        if (transition is "new-chat" or "controlled-foreign-session") owner = owner with { Session = "session-b" };
-        f.Transition(owner, transition.StartsWith("controlled", StringComparison.Ordinal));
-        Assert.Equal(0, f.GrantCount);
-        Assert.Equal("pending", f.Request(Terminal, Command("git status", "b") with { Owner = owner }, [StatusKey]).State);
-    }
-
-    [Fact]
-    public void F04_ControlledRefreshKeepsTheSameSessionGrant()
-    {
-        var f = new PermissionFixture();
-        f.Resolve(f.Request(Terminal, Command("git status"), [StatusKey]), PermissionAnswer.Chat);
-        var owner = BoundaryData.Owner with { Connection = 2 };
-        f.Transition(owner, controlledRefresh: true);
-        Assert.Equal("executed", f.Request(Terminal, Command("git status", "b") with { Owner = owner }, [StatusKey]).State);
-    }
-
     [Fact]
     public void F04_ApprovalPinsTheOriginalDelegateAndArguments()
     {

@@ -22,17 +22,18 @@ Passing a fixture does not establish equivalent behavior in the running ACP tran
 logical clocks and fault-injection controls. These envelopes are not ACP wire messages.
 
 `tests/OneWare.Codex.AdapterBoundaryTests` models F04, F06, F08, F10 and F11 without compiling product
-source. Its approval lifecycle takes explicit approval keys; the product parser is covered in
-`tests/OneWare.Codex.UnitTests/ToolApprovalTests.cs`. F07 is also covered against the product
+source. Its fixed-owner approval decisions take explicit approval keys; the product parser is covered in
+`tests/OneWare.Codex.UnitTests/ToolApprovalTests.cs`. Conversation approval persistence and isolation are
+covered against the real service in `tests/OneWare.Codex.UnitTests/AcpApprovalMemoryTests.cs`.
+F07 is also covered against the product
 project in `tests/OneWare.Codex.UnitTests/OneWareMcpResultTests.cs`. In-memory
 at-most-once behavior is not a durable crash-recovery ledger, and fixture edit review is not native UI.
 
 The fixture projects target .NET 10 and use xUnit. Their READMEs describe execution and coverage.
 Integration claims require separate checks of the actual transport and UI implementation.
 
-The original models are not a complete specification of the current product. For example, the F04
-model resets grants on a generic reconnect, while `AcpApprovalMemoryTests` verifies conversation-level
-approval persistence. The F10 snapshot model predates the live approval and model selection covered by
+The original models are not a complete specification of the current product. The F10 snapshot model
+predates the live approval and model selection covered by
 `AcpLiveApprovalTests` and `AcpLiveModelTests`. F11 backend descriptor agreement remains an isolated
 model check. Passing it does not prove that runtime capability.
 
