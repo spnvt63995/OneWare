@@ -4,7 +4,7 @@ The initial adapter contract separates transport behavior from shared OneWare ch
 synthetic fixtures exercise ownership, approval and replay invariants without using a real account or profile.
 Passing a fixture does not establish equivalent behavior in the running ACP transport or native UI.
 
-| Contract | Modeled boundary |
+| Contract | Boundary under test |
 | --- | --- |
 | F01 | Match tool notifications and requests before invocation or approval, in either arrival order. |
 | F02 | Reject missing, mismatched, expired or foreign provider/profile/session/connection/prompt/call ownership. |
@@ -16,12 +16,12 @@ Passing a fixture does not establish equivalent behavior in the running ACP tran
 | F08 | Resume the same session; retain history on failure and reject stale or foreign responses. |
 | F09 | Quarantine replay so loading history cannot invoke tools, request approval or duplicate saved messages. |
 | F10 | Separate saved model/reasoning intent from observed values and check queued/steered input ownership. |
-| F11 | Distinguish handler rebinding from descriptor changes; synchronize at a safe boundary with bounded retry. |
+| F11 | Rebind unchanged tool handlers and refresh local descriptors at a safe prompt boundary. |
 
 `tests/OneWare.Codex.AdapterContractTests` covers F01–F03, F05 and F09 with in-memory envelopes,
 logical clocks and fault-injection controls. These envelopes are not ACP wire messages.
 
-`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F06, F08, F10 and F11 without compiling product
+`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F06, F08 and F10 without compiling product
 source. Its fixed-owner approval decisions take explicit approval keys; the product parser is covered in
 `tests/OneWare.Codex.UnitTests/ToolApprovalTests.cs`. Conversation approval persistence and isolation are
 covered against the real service in `tests/OneWare.Codex.UnitTests/AcpApprovalMemoryTests.cs`.
@@ -37,8 +37,13 @@ and input ownership independently; it does not freeze options or attachments. Pr
 `AcpLiveApprovalTests`, `AcpLiveModelTests` and `AcpFeatureTests` cover live approval, next-message model
 selection, queued content/agent snapshots and steering ownership. The model's explicit/inherited
 combinations, review-required outcomes and controlled-refresh bridge do not establish equivalent
-product support. F11 backend descriptor agreement also remains an isolated model check. Passing it
-does not prove that runtime capability.
+product support.
+
+F11 is covered against the product by `McpBoundaryTests` and `AcpToolRefreshTests`. Local catalog
+comparison, publication and session refresh do not confirm a backend readback of every descriptor.
+The product's bounded local registry capture is distinct from backend retries. Its current catalog
+signature preserves JSON schema property order, and changes during pending approval invalidate the
+request. These behaviors must not be replaced by assumptions from an independent catalog model.
 
 Product regression tests use `AcpHarness` to construct the real service and `AcpPeer` to supply
 deterministic ACP notifications and replies. MCP tool calls still cross the local HTTP endpoint.

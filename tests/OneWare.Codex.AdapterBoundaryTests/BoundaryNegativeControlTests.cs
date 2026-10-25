@@ -50,15 +50,4 @@ public sealed class BoundaryNegativeControlTests
         Assert.True(f.Saved.Model.Explicit);
         Assert.NotNull(Record.Exception(() => Assert.False(f.Saved.Model.Explicit)));
     }
-
-    [Fact]
-    public void Detects_F11_IgnoringBackendDescriptionAndReadOnlyMetadata()
-    {
-        var f = new CatalogFixture(ignoreMetadataFault: true);
-        f.Register(BoundaryData.Tool());
-        f.ObserveBackend = offered => offered.ToDictionary(x => x.Key, x => x.Value with { Description = "stale", ReadOnly = false });
-        Assert.True(f.Synchronize());
-        Assert.True(f.Ready);
-        Assert.NotNull(Record.Exception(() => Assert.False(f.Ready)));
-    }
 }

@@ -9,6 +9,38 @@ namespace OneWare.Codex.UnitTests;
 
 public sealed class McpBoundaryTests
 {
+    [Theory]
+    [InlineData("add")]
+    [InlineData("remove")]
+    [InlineData("description")]
+    [InlineData("schema")]
+    [InlineData("readOnly")]
+    [InlineData("schema-property-order")]
+    public async Task DescriptorChangesPublishANewCatalog(string change)
+    {
+        var schema = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"value":{"type":"string"}},"required":["value"]}""");
+        var tool = new OneWareMcpTool("fixture", "original", schema, true);
+        OneWareMcpTool[] changed = change switch
+        {
+            "add" => [tool, tool with { Name = "added" }],
+            "remove" => [],
+            "description" => [tool with { Description = "changed" }],
+            "schema" => [tool with { InputSchema = JsonSerializer.Deserialize<JsonElement>("""{"type":"object","properties":{"count":{"type":"integer"}}}""") }],
+            "readOnly" => [tool with { IsReadOnly = false }],
+            "schema-property-order" => [tool with { InputSchema = JsonSerializer.Deserialize<JsonElement>("""{"required":["value"],"properties":{"value":{"type":"string"}},"type":"object"}""") }],
+            _ => throw new ArgumentOutOfRangeException(nameof(change))
+        };
+        // The current catalog signature preserves schema property order; do not canonicalize it here.
+        if (change == "schema-property-order") Assert.True(JsonElement.DeepEquals(schema, changed[0].InputSchema));
+        await using var server = new OneWareMcpServer([tool], (_, _, _, _) =>
+            throw new InvalidOperationException("No tool invocation is expected."));
+        var url = server.Url;
+        Assert.False(server.Matches(changed));
+        server.Publish(changed);
+        Assert.True(server.Matches(changed));
+        Assert.NotEqual(url, server.Url);
+    }
+
     [Fact]
     public async Task EndpointUsesOnlyMcpDescriptorsAndForwardsInvocationMetadataToItsOwner()
     {

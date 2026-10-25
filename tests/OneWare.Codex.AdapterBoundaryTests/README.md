@@ -1,8 +1,8 @@
 # Adapter boundary fixtures
 
-This isolated .NET 10/xUnit project models F04, F06, F08, F10 and F11 from
+This isolated .NET 10/xUnit project models F04, F06, F08 and F10 from
 [the adapter contract](../../docs/CodexAdapterContract.md).
-There are **73 contract cases and 5 fault-injection controls**.
+There are **54 contract cases and 4 fault-injection controls**.
 
 | Contract | Cases | Executed boundary |
 | --- | ---: | --- |
@@ -10,8 +10,7 @@ There are **73 contract cases and 5 fault-injection controls**.
 | F06 | 14 | Invocation IDs, row ownership, client/service completion, echo suppression and in-memory edit review |
 | F08 | 10 | Same-ID resume, failed retry, foreign/stale response isolation and local history preservation |
 | F10 | 12 | Saved intent vs observed values; input identity, connection and prompt scope |
-| F11 | 19 | Handler rebind vs descriptor refresh, deferred synchronization, backend descriptor agreement and bounded retry |
-| Negative controls | 5 | One injected violation per modeled contract is detected by the corresponding invariant |
+| Negative controls | 4 | One injected violation per modeled contract is detected by the corresponding invariant |
 
 F04 command parsing and approval keys are tested against the product project in
 [`ToolApprovalTests`](../OneWare.Codex.UnitTests/ToolApprovalTests.cs). The fixed-owner model takes those
@@ -37,6 +36,13 @@ F07 result encoding is tested against the product project in
 the real HTTP endpoint checks in `McpBoundaryTests`. This project does not compile a separate copy
 of the result encoder.
 
+F11 catalog comparison and publishing are tested against the real MCP server in
+[`McpBoundaryTests`](../OneWare.Codex.UnitTests/McpBoundaryTests.cs).
+[`AcpToolRefreshTests`](../OneWare.Codex.UnitTests/AcpToolRefreshTests.cs) covers handler replacement,
+idle/deferred refresh, same-session resume, pending approval invalidation, retry after failure and
+disposal. No separate catalog implementation is compiled here. These tests do not establish that the
+ACP backend has read back and confirmed every descriptor field.
+
 ## Run
 
 Use the .NET 10 SDK:
@@ -52,11 +58,10 @@ and replay cases are in `OneWare.Codex.AdapterContractTests`.
 
 No product source or project is linked into this test assembly. No
 Studio process, model, CLI, MCP HTTP server, real profile or conversation is launched.
-F04's fixed-owner decisions and F06/F08/F10/F11 are bounded contract models, not the running product service.
+F04's fixed-owner decisions and F06/F08/F10 are bounded contract models, not the running product service.
 F06 edit acceptance changes an in-memory fixture document only, not Avalonia UI or disk.
-F11's full descriptor agreement is a fixture acceptance condition; it does not validate the
-running ACP backend's descriptor synchronization. The fault controls measure oracle sensitivity,
-not reproduced product defects. These fixtures alone do not establish runtime ACP compatibility.
+The fault controls measure oracle sensitivity, not reproduced product defects. These fixtures alone
+do not establish runtime ACP compatibility.
 
 F10's explicit/inherited intent, review-required outcomes and controlled-refresh bridge remain isolated
 model conditions. They do not establish support for every inheritance or scope combination, a product

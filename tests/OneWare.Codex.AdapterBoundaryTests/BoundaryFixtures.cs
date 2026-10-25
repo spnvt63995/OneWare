@@ -7,12 +7,7 @@ internal sealed record BoundaryOwner(string Provider, string Profile, int Connec
     int Prompt, string Directory);
 internal sealed record BoundaryInvocation(BoundaryOwner Owner, string CallId, string Tool, JsonElement Arguments);
 internal sealed record FunctionSpec(string Name, string Description, string Schema, bool ReadOnly,
-    Func<BoundaryInvocation, object?> Handler, Func<JsonElement, string?>? Confirmation = null)
-{
-    public bool SameDescriptor(FunctionSpec other) => Name == other.Name && Description == other.Description &&
-        ReadOnly == other.ReadOnly &&
-        JsonElement.DeepEquals(JsonSerializer.Deserialize<JsonElement>(Schema), JsonSerializer.Deserialize<JsonElement>(other.Schema));
-}
+    Func<BoundaryInvocation, object?> Handler, Func<JsonElement, string?>? Confirmation = null);
 internal static class BoundaryData
 {
     public static readonly BoundaryOwner Owner = new("codex-test", "isolated", 1, "session-a", 1, "/fixture/work");

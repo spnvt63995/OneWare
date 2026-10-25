@@ -10,11 +10,31 @@ namespace OneWare.Codex.UnitTests;
 public sealed class AcpToolRefreshTests
 {
     [AvaloniaFact]
+    public async Task HandlerOnlyReplacementUsesCurrentHandlerWithoutResuming()
+    {
+        await using var h = new AcpHarness();
+        await FirstTurn(h);
+        h.Register("REBOUND_");
+        var send = h.Service.SendAsync("Use the current handler.");
+        await AcpHarness.Until(() => h.Peer.Prompts.Count == 2);
+        var result = await h.Peer.CallTool("rebound", "acp_fixture", new { value = "value" });
+        Assert.False(result.GetProperty("isError").GetBoolean());
+        Assert.Contains("REBOUND_value", result.GetRawText());
+        Assert.Single(h.Starts);
+        h.Peer.Complete();
+        await send;
+        Assert.Equal(0, h.Peer.Resumes);
+        Assert.Equal(1, h.Peer.NewSessions);
+        Assert.Equal(h.Peer.Id, h.Service.CurrentSessionId);
+        Assert.Empty(h.Events.OfType<ChatErrorEvent>());
+    }
+
+    [AvaloniaFact]
     public async Task IdleRegistrationBurstRefreshesSameSessionWithoutAnotherMessageOrReplay()
     {
         await using var h = new AcpHarness();
         await FirstTurn(h);
-        var messages = h.Events.Count;
+        var eventCount = h.Events.Count;
         h.Peer.ReplayOnResume = true;
         for (var i = 0; i < 6; i++) Register(h, "acp_added_" + i);
         await AcpHarness.Until(() => h.Peer.Resumes == 1);
@@ -23,7 +43,8 @@ public sealed class AcpToolRefreshTests
         Assert.Equal(h.Peer.Id, h.Service.CurrentSessionId);
         Assert.Equal(1, h.Peer.NewSessions);
         Assert.Single(h.Peer.Prompts);
-        Assert.Equal(messages, h.Events.Count);
+        // Reconnecting clears transient notices; replay must not emit any other chat events.
+        Assert.All(h.Events.Skip(eventCount), e => Assert.IsType<ChatNoticesClearedEvent>(e));
         Assert.Empty(h.Starts);
     }
 
