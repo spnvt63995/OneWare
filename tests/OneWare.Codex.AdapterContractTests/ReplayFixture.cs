@@ -7,7 +7,7 @@ internal sealed record Message(string Id, string Role, string Text);
 /// responsible for tagging load-origin events; proving that ACP mapping is deliberately deferred.
 /// Unknown/incomplete replay stays quarantined. No content-string deduplication or automatic merge.
 /// </summary>
-internal sealed class ReplayFixture(Owner owner, IEnumerable<Message> saved, ContractFixture calls,
+internal sealed class ReplayFixture(Owner owner, IEnumerable<Message> saved, ContractEffects calls,
     Fault fault = Fault.None)
 {
     private readonly List<Message> _history = saved.ToList();
@@ -64,18 +64,17 @@ internal sealed class ReplayFixture(Owner owner, IEnumerable<Message> saved, Con
 
     public void ObserveTool(Owner source, long? load, ToolCall call)
     {
-        if (!Fence(source, load)) calls.Notice(call);
+        if (!Fence(source, load)) calls.ObserveTool(call);
     }
 
-    public Receipt ObserveCallback(Owner source, long? load, string rpcId, ToolCall call) =>
-        Fence(source, load) ? new Receipt { State = CallState.Rejected, Error = "history-replay" } : calls.Request(rpcId, call);
+    public Receipt ObserveCallback(Owner source, long? load, ToolCall call) =>
+        Fence(source, load) ? new Receipt { State = CallState.Rejected, Error = "history-replay" } : calls.Request(call);
 
     public void ObservePermission(Owner source, long? load, ToolCall call)
     {
         if (Fence(source, load)) return;
         // Deliberate faulty route for the negative control: a replayed permission becomes a live call.
-        calls.Notice(call);
-        calls.Request("permission-" + call.CallId, call);
+        calls.Request(call);
     }
 
     public bool CompleteLoad(long load, Owner returnedOwner, bool success = true)

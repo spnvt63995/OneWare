@@ -10,6 +10,53 @@ namespace OneWare.Codex.UnitTests;
 public sealed class McpBoundaryTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RpcIdIsReservedOnlyWhileItsRequestIsActive(bool fail)
+    {
+        var schema = JsonSerializer.Deserialize<JsonElement>("""{"type":"object"}""");
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var invocations = 0;
+        await using var server = new OneWareMcpServer([new("fixture", null, schema, true)],
+            async (_, _, _, token) =>
+            {
+                if (Interlocked.Increment(ref invocations) == 1)
+                {
+                    entered.TrySetResult(true);
+                    await release.Task.WaitAsync(token);
+                    if (fail) throw new InvalidOperationException("fixture failure");
+                }
+                return OneWareMcpResult.Success(new TextContent("reply"));
+            });
+        using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        client.DefaultRequestHeaders.Add("Authorization", server.Authorization);
+        async Task<JsonElement> Request()
+        {
+            using var response = await client.PostAsJsonAsync(server.Url,
+                new { jsonrpc = "2.0", id = 7, method = "tools/call",
+                    @params = new { name = "fixture", arguments = new { } } });
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<JsonElement>();
+        }
+        var first = Request();
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var duplicate = await Request();
+            Assert.Equal(-32600, duplicate.GetProperty("error").GetProperty("code").GetInt32());
+            Assert.Equal(1, Volatile.Read(ref invocations));
+        }
+        finally
+        {
+            release.TrySetResult(true);
+        }
+        Assert.Equal(fail, (await first).GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.False((await Request()).GetProperty("result").GetProperty("isError").GetBoolean());
+        Assert.Equal(2, Volatile.Read(ref invocations));
+    }
+
+    [Theory]
     [InlineData("add")]
     [InlineData("remove")]
     [InlineData("description")]

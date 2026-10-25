@@ -1,5 +1,5 @@
 using Xunit;
-using static OneWare.Codex.AdapterContractTests.CallContractTests;
+using static OneWare.Codex.AdapterContractTests.ContractTestSupport;
 
 namespace OneWare.Codex.AdapterContractTests;
 
@@ -20,8 +20,7 @@ public sealed class ApprovalContractTests
     public void F05_LateButtonAfterScopeEndsCannotExecuteOrGrant(string transition, string answer)
     {
         var fixture = Fixture(approval: true);
-        fixture.Notice(Call());
-        var receipt = fixture.Request("rpc-a", Call());
+        var receipt = fixture.Request(Call());
         var decision = Assert.Single(fixture.PendingDecisions);
         switch (transition)
         {
@@ -45,8 +44,7 @@ public sealed class ApprovalContractTests
     public void F05_CompletedDecisionCannotBeUpgradedToAChatGrant(string firstAnswer)
     {
         var fixture = Fixture(approval: true);
-        fixture.Notice(Call());
-        fixture.Request("rpc-a", Call());
+        fixture.Request(Call());
         var decision = Assert.Single(fixture.PendingDecisions);
         Assert.True(fixture.Resolve(decision, firstAnswer == "deny" ? Answer.Deny : Answer.Once));
         Assert.False(fixture.Resolve(decision, Answer.Chat));
@@ -59,14 +57,12 @@ public sealed class ApprovalContractTests
     public void F05_OldDecisionCannotApproveANewCallWithTheSameCallId()
     {
         var fixture = Fixture(approval: true);
-        fixture.Notice(Call());
-        fixture.Request("rpc-a", Call());
+        fixture.Request(Call());
         var stale = Assert.Single(fixture.PendingDecisions);
         var nextOwner = Scope with { Connection = 2, Prompt = 2 };
         fixture.Begin(nextOwner);
         var next = Call() with { Owner = nextOwner };
-        fixture.Notice(next);
-        fixture.Request("rpc-a", next); // HTTP ids are per connection; logical ownership is still checked.
+        fixture.Request(next);
         var current = Assert.Single(fixture.PendingDecisions);
         Assert.NotEqual(stale, current);
         Assert.False(fixture.Resolve(stale, Answer.Chat));

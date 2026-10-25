@@ -7,8 +7,8 @@ Passing a fixture does not establish equivalent behavior in the running ACP tran
 | Contract | Boundary under test |
 | --- | --- |
 | F01 | Match tool notifications and requests before invocation or approval, in either arrival order. |
-| F02 | Reject missing, mismatched, expired or foreign provider/profile/session/connection/prompt/call ownership. |
-| F03 | Invoke a logical call at most once within the fixture lifetime despite duplicate request IDs or retries. |
+| F02 | Check the active connection/prompt, session, call ID, tool and arguments at the product boundary. |
+| F03 | Claim each logical call once in its prompt; reserve an HTTP RPC ID only while that request is active. |
 | F04 | Preserve shared approval conditions, one-shot decisions and chat-scoped command-prefix grants. |
 | F05 | Ignore late approval decisions after their owner ends; do not execute or create a grant. |
 | F06 | Keep tool rows, completion and edit review attached to the owning session and invocation. |
@@ -18,8 +18,23 @@ Passing a fixture does not establish equivalent behavior in the running ACP tran
 | F10 | Separate saved model/reasoning intent from observed values and check queued/steered input ownership. |
 | F11 | Rebind unchanged tool handlers and refresh local descriptors at a safe prompt boundary. |
 
-`tests/OneWare.Codex.AdapterContractTests` covers F01–F03, F05 and F09 with in-memory envelopes,
-logical clocks and fault-injection controls. These envelopes are not ACP wire messages.
+`tests/OneWare.Codex.AdapterContractTests` models F05 and F09 with synthetic scope labels,
+decision handles, effect recording and fault-injection controls. These labels are not ACP wire messages.
+
+F01–F03 are covered at the product boundary by `AcpAdapterTests`, `AcpToolMatchingTests`,
+`AcpParallelSessionTests` and `McpBoundaryTests`. Both arrival orders wait for a matching pair before
+approval or invocation. JSON object property order does not affect matching; array order does.
+The adapter checks its connection/generation and active prompt plus the session and call IDs carried
+by MCP; it does not receive the old model's provider/profile/connection/prompt envelope on the wire.
+Existing cancellation, conversation isolation and profile-binding tests cover their respective owners.
+
+The first tool-call notice wins; a later conflicting notice does not replace a pending approval.
+A request that times out waiting for its notice fails that HTTP request without permanently retiring
+the logical call. A later matched retry can run. Concurrent callbacks and retries during invocation or
+after success/failure do not invoke that logical call again. The MCP server releases its RPC ID when
+the HTTP invocation finishes, including failure. There is no independent matching clock, permanent
+RPC ledger, recursive duplicate-JSON-key policy or durable crash-recovery guarantee in the fixtures.
+These product tests do not exhaust every malformed envelope or every connection/cancellation race.
 
 F05's model records accepted decision effects only; it does not store or expire conversation grants.
 An expired pending decision and an already accepted chat approval have different lifetimes.
@@ -29,8 +44,7 @@ source. Its fixed-owner approval decisions take explicit approval keys; the prod
 `tests/OneWare.Codex.UnitTests/ToolApprovalTests.cs`. Conversation approval persistence and isolation are
 covered against the real service in `tests/OneWare.Codex.UnitTests/AcpApprovalMemoryTests.cs`.
 F07 is also covered against the product
-project in `tests/OneWare.Codex.UnitTests/OneWareMcpResultTests.cs`. In-memory
-at-most-once behavior is not a durable crash-recovery ledger.
+project in `tests/OneWare.Codex.UnitTests/OneWareMcpResultTests.cs`.
 
 F06 host invocation IDs and row progress/completion are covered by product tests in `AcpAdapterTests`
 and `AcpToolDetailsTests`, including completion in the original chat while another is selected and

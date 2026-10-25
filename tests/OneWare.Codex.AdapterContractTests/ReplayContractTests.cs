@@ -1,5 +1,5 @@
 using Xunit;
-using static OneWare.Codex.AdapterContractTests.CallContractTests;
+using static OneWare.Codex.AdapterContractTests.ContractTestSupport;
 
 namespace OneWare.Codex.AdapterContractTests;
 
@@ -25,7 +25,7 @@ public sealed class ReplayContractTests
             replay.ObserveMessage(Scope, load, message);
         }
         replay.ObserveTool(Scope, load, Call());
-        Assert.Equal(CallState.Rejected, replay.ObserveCallback(Scope, load, "rpc-a", Call()).State);
+        Assert.Equal(CallState.Rejected, replay.ObserveCallback(Scope, load, Call()).State);
         replay.ObservePermission(Scope, load, Call("old-permission"));
         Assert.True(replay.CompleteLoad(load, Scope));
         Assert.Equal(Saved, replay.History);
@@ -54,7 +54,7 @@ public sealed class ReplayContractTests
         }
         replay.ObserveMessage(Scope, tag, new("unmapped-replay-id", "assistant", "old output"));
         replay.ObserveTool(Scope, tag, Call());
-        replay.ObserveCallback(Scope, tag, "rpc-a", Call());
+        replay.ObserveCallback(Scope, tag, Call());
         replay.ObservePermission(Scope, tag, Call("permission"));
         Assert.Equal(Saved, replay.History);
         Assert.Equal(0, replay.Writes);
@@ -122,12 +122,12 @@ public sealed class ReplayContractTests
         Assert.Equal(Saved.Append(live), replay.History);
         Assert.Equal(1, replay.Writes);
         replay.ObserveTool(Scope, null, Call());
-        Assert.Equal(CallState.Executing, replay.ObserveCallback(Scope, null, "rpc-live", Call()).State);
+        Assert.Equal(Call(), Assert.Single(calls.ToolNotices));
+        Assert.Equal(CallState.Invoked, replay.ObserveCallback(Scope, null, Call()).State);
         Assert.Single(calls.Invocations);
-        Assert.True(calls.Finish(Call()));
         // Late replay must not rewrite the newly extended history or re-execute the tool.
         replay.ObserveMessage(Scope, load, live);
-        replay.ObserveCallback(Scope, load, "rpc-late", Call());
+        replay.ObserveCallback(Scope, load, Call());
         Assert.Equal(1, replay.Writes);
         Assert.Single(calls.Invocations);
     }

@@ -27,7 +27,7 @@ public sealed class AcpAdapterTests
     [InlineData(true)]
     public async Task ActualAdapterMatchesHttpAndAcpInEitherOrderAndInvokesOriginalRegistryOnce(bool httpFirst)
     {
-        await using var h = new AcpHarness();
+        await using var h = new AcpHarness(confirm: true);
         var send = h.Service.SendAsync("read the fixture");
         await h.Peer.PromptStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
         var call = "call-first";
@@ -37,14 +37,20 @@ public sealed class AcpAdapterTests
             result = h.Peer.Call(call);
             await Task.Delay(30);
             Assert.Empty(h.Starts);
+            Assert.Empty(h.Events.OfType<ChatPermissionRequestEvent>());
             h.Peer.Tool(call);
         }
         else
         {
             h.Peer.Tool(call);
+            Assert.Empty(h.Starts);
+            Assert.Empty(h.Events.OfType<ChatPermissionRequestEvent>());
             result = h.Peer.Call(call);
         }
 
+        await AcpHarness.Until(() => h.Events.OfType<ChatPermissionRequestEvent>().Any());
+        Assert.Empty(h.Starts);
+        Assert.Single(h.Events.OfType<ChatPermissionRequestEvent>()).AllowCommand.Execute(null);
         var response = await result;
         Assert.False(response.GetProperty("isError").GetBoolean());
         // Preserve the original AiFunctionProvider's JSON serialization, including string quotes.
