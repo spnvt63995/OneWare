@@ -2,8 +2,8 @@ namespace OneWare.Codex.Services;
 
 internal sealed partial class AcpChatService
 {
-    internal const string DefaultContextTier = "Default";
-    internal const string LongContextTier = "Long Context";
+    internal const string ContextTierDefault = "Default";
+    internal const string ContextTierLong = "Long Context";
     private readonly Func<CancellationToken, Task<IReadOnlyDictionary<string, AcpContextLimits>>> _readContextCatalog;
     private IReadOnlyDictionary<string, AcpContextLimits>? _contextCatalog;
     private (string? Kind, string Details) _contextIdentity;
@@ -43,14 +43,14 @@ internal sealed partial class AcpChatService
     {
         if (ContextLimits(model) is not { } limits) return [];
         var standard = new AcpContextSize(AcpContextSize.FormatTokens(limits.DefaultTokens),
-            DefaultContextTier, limits.DefaultTokens);
+            ContextTierDefault, limits.DefaultTokens);
         return limits.MaximumTokens > limits.DefaultTokens
-            ? [standard, new(AcpContextSize.FormatTokens(limits.MaximumTokens), LongContextTier, limits.MaximumTokens)]
+            ? [standard, new(AcpContextSize.FormatTokens(limits.MaximumTokens), ContextTierLong, limits.MaximumTokens)]
             : [standard];
     }
 
     private long? ContextWindow(string model, string tier) => ContextLimits(model) is { } limits
-        ? tier == LongContextTier ? limits.MaximumTokens : limits.DefaultTokens : null;
+        ? tier == ContextTierLong ? limits.MaximumTokens : limits.DefaultTokens : null;
 
     private void RefreshContextProjection()
     {

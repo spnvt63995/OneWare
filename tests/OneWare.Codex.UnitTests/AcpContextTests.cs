@@ -82,18 +82,18 @@ public sealed class AcpContextTests
         await h.Service.SelectContextSizeAsync(h.Service.ContextSizes.Last());
         Assert.Equal(id, h.Service.CurrentSessionId);
         Assert.Equal(1, h.Peer.Resumes);
-        Assert.Equal(AcpChatService.LongContextTier, h.Profile.LoadSelection(id)!.ContextTier);
+        Assert.Equal(AcpChatService.ContextTierLong, h.Profile.LoadSelection(id)!.ContextTier);
         Assert.Empty(h.Events.OfType<ChatErrorEvent>());
         settings.Save(disk.Path);
         await h.Service.SelectModelAsync(h.Service.Models.Single(x => x.Value == "single-size"));
-        Assert.Equal(AcpChatService.DefaultContextTier, h.Service.SelectedContextSize!.Tier);
+        Assert.Equal(AcpChatService.ContextTierDefault, h.Service.SelectedContextSize!.Tier);
         await h.Service.SelectModelAsync(h.Service.Models.Single(x => x.Value == "gpt-6-luna"));
-        Assert.Equal(AcpChatService.LongContextTier, h.Service.SelectedContextSize!.Tier);
+        Assert.Equal(AcpChatService.ContextTierLong, h.Service.SelectedContextSize!.Tier);
 
         var restoredSettings = AcpTestSupport.Settings();
         restoredSettings.Register(AcpChatService.SelectionKey, "");
         restoredSettings.Load(disk.Path);
-        Assert.Equal(AcpChatService.LongContextTier,
+        Assert.Equal(AcpChatService.ContextTierLong,
             JsonSerializer.Deserialize<AcpSelection>(restoredSettings.GetSettingValue<string>(
                 AcpChatService.SelectionKey))!.ContextTier);
         restoredSettings.SetSettingValue(AcpChatService.SelectionKey,
@@ -103,9 +103,9 @@ public sealed class AcpContextTests
             settings: restoredSettings, contextCatalog: Catalog);
         Assert.True(await restored.LoadSessionAsync(id));
         Assert.Equal(id, restored.CurrentSessionId);
-        Assert.Equal(AcpChatService.LongContextTier, restored.SelectedContextSize!.Tier);
+        Assert.Equal(AcpChatService.ContextTierLong, restored.SelectedContextSize!.Tier);
         await restored.SelectContextSizeAsync(restored.ContextSizes.First());
-        Assert.Equal(AcpChatService.DefaultContextTier, h.Profile.LoadSelection(id)!.ContextTier);
+        Assert.Equal(AcpChatService.ContextTierDefault, h.Profile.LoadSelection(id)!.ContextTier);
         Assert.Empty(h.Peer.Prompts);
     }
 
@@ -120,12 +120,12 @@ public sealed class AcpContextTests
         h.Peer.FailResume = true;
         await h.Service.SelectContextSizeAsync(h.Service.ContextSizes.Last());
         Assert.Equal(before, settings.GetSettingValue<string>(AcpChatService.SelectionKey));
-        Assert.Equal(AcpChatService.DefaultContextTier, h.Profile.LoadSelection(id)!.ContextTier);
+        Assert.Equal(AcpChatService.ContextTierDefault, h.Profile.LoadSelection(id)!.ContextTier);
         Assert.Equal(id, h.Service.CurrentSessionId);
         Assert.Single(h.Events.OfType<ChatErrorEvent>());
         h.Peer.FailResume = false;
         await h.Service.SelectContextSizeAsync(h.Service.ContextSizes.Last());
-        Assert.Equal(AcpChatService.LongContextTier, h.Profile.LoadSelection(id)!.ContextTier);
+        Assert.Equal(AcpChatService.ContextTierLong, h.Profile.LoadSelection(id)!.ContextTier);
     }
 
     [AvaloniaFact]
@@ -142,13 +142,13 @@ public sealed class AcpContextTests
         peer = new AcpPeer();
         await using var sibling = (AcpChatService)h.Service.CreateSession();
         await sibling.RefreshOptionsAsync();
-        Assert.Equal(AcpChatService.LongContextTier, sibling.SelectedContextSize!.Tier);
+        Assert.Equal(AcpChatService.ContextTierLong, sibling.SelectedContextSize!.Tier);
         await sibling.SelectContextSizeAsync(sibling.ContextSizes.First());
         Assert.NotEqual(first, sibling.CurrentSessionId);
-        Assert.Equal(AcpChatService.DefaultContextTier, sibling.SelectedContextSize!.Tier);
-        Assert.Equal(AcpChatService.LongContextTier, h.Service.SelectedContextSize!.Tier);
-        Assert.Equal(AcpChatService.LongContextTier, h.Profile.LoadSelection(first)!.ContextTier);
-        Assert.Equal(AcpChatService.DefaultContextTier,
+        Assert.Equal(AcpChatService.ContextTierDefault, sibling.SelectedContextSize!.Tier);
+        Assert.Equal(AcpChatService.ContextTierLong, h.Service.SelectedContextSize!.Tier);
+        Assert.Equal(AcpChatService.ContextTierLong, h.Profile.LoadSelection(first)!.ContextTier);
+        Assert.Equal(AcpChatService.ContextTierDefault,
             h.Profile.LoadSelection(sibling.CurrentSessionId!)!.ContextTier);
     }
 
@@ -162,7 +162,7 @@ public sealed class AcpContextTests
         Assert.False(h.Service.CanEditContextSize);
         await h.Service.SelectContextSizeAsync(h.Service.ContextSizes.Last());
         Assert.Equal(0, h.Peer.Resumes);
-        Assert.Equal(AcpChatService.DefaultContextTier, h.Service.SelectedContextSize!.Tier);
+        Assert.Equal(AcpChatService.ContextTierDefault, h.Service.SelectedContextSize!.Tier);
         h.Peer.Complete();
         await send;
         await using var unavailable = new AcpHarness(contextCatalog: _ =>

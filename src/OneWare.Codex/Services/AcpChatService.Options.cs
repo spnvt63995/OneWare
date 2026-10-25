@@ -5,7 +5,7 @@ using OneWare.Essentials.Services;
 
 namespace OneWare.Codex.Services;
 
-internal sealed record AcpSelection(string Model, string? Effort, string ContextTier = AcpChatService.DefaultContextTier);
+internal sealed record AcpSelection(string Model, string? Effort, string ContextTier = AcpChatService.ContextTierDefault);
 internal sealed record AcpOptionChoice(string Value, string Label, string? Description);
 
 internal sealed partial class AcpChatService

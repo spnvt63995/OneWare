@@ -140,7 +140,6 @@
     <Project Path="tests/OneWare.Codex.AdapterBoundaryTests/OneWare.Codex.AdapterBoundaryTests.csproj" />
     <Project Path="tests/OneWare.Codex.AdapterContractTests/OneWare.Codex.AdapterContractTests.csproj" />
     <Project Path="tests/OneWare.Codex.UnitTests/OneWare.Codex.UnitTests.csproj" />
-    <Project Path="tests/OneWare.Codex.AcpVerification/OneWare.Codex.AcpVerification.csproj" />
     <Project Path="tests/OneWare.ApplicationCommands.UnitTests/OneWare.ApplicationCommands.UnitTests.csproj" />
     <Project Path="tests/OneWare.Chat.UnitTests/OneWare.Chat.UnitTests.csproj" />
     <Project Path="tests/OneWare.Copilot.UnitTests/OneWare.Copilot.UnitTests.csproj" />
