@@ -19,7 +19,6 @@ internal sealed partial class AcpChatService
         public string Id { get; } = number == 1 ? conversation.Id : conversation.Id + "-turn-" + number;
         public string[] Ancestors => Conversation.Ancestors;
         public AcpPluginCatalog Catalog => Conversation.Catalog;
-        public Delegation? Parent { get; } = parent;
         public bool IsBackground { get; } = background;
         public bool Detached { get; } = background || parent?.Detached == true;
         public long Epoch { get; } = epoch;
