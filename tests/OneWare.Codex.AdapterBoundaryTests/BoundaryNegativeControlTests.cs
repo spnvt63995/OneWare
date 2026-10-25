@@ -61,17 +61,4 @@ public sealed class BoundaryNegativeControlTests
         Assert.True(f.Ready);
         Assert.NotNull(Record.Exception(() => Assert.False(f.Ready)));
     }
-
-    [Fact]
-    public void Detects_F12_ExecutingAnArchivedHandlerAfterRemoval()
-    {
-        var f = new CatalogFixture(archivedAliasFault: true);
-        var called = 0;
-        var old = BoundaryData.Tool(handler: _ => ++called);
-        f.SaveLegacyDefinition(old);
-        Assert.True(f.Synchronize());
-        Assert.True(f.InvokeLegacy("oneware_readFile", BoundaryData.Json("""{"path":"a"}""")));
-        Assert.Equal(1, called);
-        Assert.NotNull(Record.Exception(() => Assert.Equal(0, called)));
-    }
 }

@@ -2,11 +2,10 @@ using System.Text.Json;
 
 namespace OneWare.Codex.AdapterBoundaryTests;
 
-internal sealed class CatalogFixture(bool ignoreMetadataFault = false, bool archivedAliasFault = false)
+internal sealed class CatalogFixture(bool ignoreMetadataFault = false)
 {
     private readonly Dictionary<string, FunctionSpec> _local = new(StringComparer.Ordinal);
     private Dictionary<string, FunctionSpec> _published = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, FunctionSpec> _archived = new(StringComparer.Ordinal);
     private int _revision;
     public string SessionId { get; } = "session-a";
     public bool Busy { get; set; }
@@ -17,8 +16,6 @@ internal sealed class CatalogFixture(bool ignoreMetadataFault = false, bool arch
     public List<string> ResumedIds { get; } = [];
     public List<string> InvokedHandlers { get; } = [];
     public List<BoundaryInvocation> Invocations { get; } = [];
-    public string[] ArchivedNames => _archived.Keys.Order().ToArray();
-    public IReadOnlyDictionary<string, FunctionSpec> ArchivedDefinitions => _archived.ToDictionary();
     public IReadOnlyDictionary<string, FunctionSpec> Published => _published;
     public Func<IReadOnlyDictionary<string, FunctionSpec>, IReadOnlyDictionary<string, FunctionSpec>> ObserveBackend { get; set; } =
         offered => offered.ToDictionary();
@@ -30,7 +27,6 @@ internal sealed class CatalogFixture(bool ignoreMetadataFault = false, bool arch
         Ready = false;
     }
     public void Remove(string name) { _local.Remove(name); _revision++; Ready = false; }
-    public void SaveLegacyDefinition(FunctionSpec function) => _archived["oneware_" + function.Name] = function;
 
     public bool Synchronize()
     {
@@ -78,15 +74,6 @@ internal sealed class CatalogFixture(bool ignoreMetadataFault = false, bool arch
         call.Function.Handler(call.Invocation);
         return true;
     }
-    public bool InvokeLegacy(string alias, JsonElement arguments, bool policyAllows = true)
-    {
-        if (!alias.StartsWith("oneware_", StringComparison.Ordinal) || !policyAllows) return false;
-        if (archivedAliasFault && _archived.TryGetValue(alias, out var old))
-            return Invoke(new(old, BoundaryData.Call(tool: old.Name) with { Arguments = arguments.Clone() }));
-        return Invoke(Prepare(alias["oneware_".Length..], arguments, policyAllows));
-    }
-    public object NewMcpSessionRequest() => new { mcpServers = new[] { "oneware" }, dynamicTools = Array.Empty<string>() };
-
     // Matches the documented required/additional-name preflight only, NOT full JSON Schema validation.
     private static bool Valid(FunctionSpec function, JsonElement arguments)
     {

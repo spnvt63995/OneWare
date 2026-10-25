@@ -17,12 +17,11 @@ Passing a fixture does not establish equivalent behavior in the running ACP tran
 | F09 | Quarantine replay so loading history cannot invoke tools, request approval or duplicate saved messages. |
 | F10 | Preserve explicit/inherited model and reasoning intent, including Queue/Steer snapshots and scope. |
 | F11 | Distinguish handler rebinding from descriptor changes; synchronize at a safe boundary with bounded retry. |
-| F12 | Resolve historical aliases through current handlers or fail explicitly when a tool or argument is incompatible. |
 
 `tests/OneWare.Codex.AdapterContractTests` covers F01–F03, F05 and F09 with in-memory envelopes,
 logical clocks and fault-injection controls. These envelopes are not ACP wire messages.
 
-`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F06, F08 and F10–F12 without compiling product
+`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F06, F08, F10 and F11 without compiling product
 source. Its approval lifecycle takes explicit approval keys; the product parser is covered in
 `tests/OneWare.Codex.UnitTests/ToolApprovalTests.cs`. F07 is also covered against the product
 project in `tests/OneWare.Codex.UnitTests/OneWareMcpResultTests.cs`. In-memory
@@ -34,8 +33,8 @@ Integration claims require separate checks of the actual transport and UI implem
 The original models are not a complete specification of the current product. For example, the F04
 model resets grants on a generic reconnect, while `AcpApprovalMemoryTests` verifies conversation-level
 approval persistence. The F10 snapshot model predates the live approval and model selection covered by
-`AcpLiveApprovalTests` and `AcpLiveModelTests`. F11 backend descriptor agreement and F12 historical
-aliases remain isolated model checks. Passing them does not prove those runtime capabilities.
+`AcpLiveApprovalTests` and `AcpLiveModelTests`. F11 backend descriptor agreement remains an isolated
+model check. Passing it does not prove that runtime capability.
 
 Product regression tests use `AcpHarness` to construct the real service and `AcpPeer` to supply
 deterministic ACP notifications and replies. MCP tool calls still cross the local HTTP endpoint.

@@ -1,8 +1,8 @@
 # Adapter boundary fixtures
 
-This isolated .NET 10/xUnit project models F04, F06, F08 and F10–F12 from
+This isolated .NET 10/xUnit project models F04, F06, F08, F10 and F11 from
 [the adapter contract](../../docs/CodexAdapterContract.md).
-There are **92 contract cases and 6 fault-injection controls**.
+There are **80 contract cases and 5 fault-injection controls**.
 
 | Contract | Cases | Executed boundary |
 | --- | ---: | --- |
@@ -11,8 +11,7 @@ There are **92 contract cases and 6 fault-injection controls**.
 | F08 | 10 | Same-ID resume, failed retry, foreign/stale response isolation and local history preservation |
 | F10 | 14 | Saved intent vs observed values; frozen Queue/Steer settings and scope checks |
 | F11 | 19 | Handler rebind vs descriptor refresh, deferred synchronization, backend descriptor agreement and bounded retry |
-| F12 | 12 | Current-handler legacy aliases, removed/changed arguments, archived definitions and no new dynamic aliases |
-| Negative controls | 6 | One injected violation per modeled contract is detected by the corresponding invariant |
+| Negative controls | 5 | One injected violation per modeled contract is detected by the corresponding invariant |
 
 F04 command parsing and approval keys are tested against the product project in
 [`ToolApprovalTests`](../OneWare.Codex.UnitTests/ToolApprovalTests.cs). The lifecycle model takes those
@@ -39,7 +38,7 @@ and replay cases are in `OneWare.Codex.AdapterContractTests`.
 
 No product source or project is linked into this test assembly. No
 Studio process, model, CLI, MCP HTTP server, real profile or conversation is launched.
-F04's lifecycle and F06/F08/F10/F11/F12 are bounded contract models, not the running product service.
+F04's lifecycle and F06/F08/F10/F11 are bounded contract models, not the running product service.
 F06 edit acceptance changes an in-memory fixture document only, not Avalonia UI or disk.
 F11's full descriptor agreement is a fixture acceptance condition; it does not validate the
 running ACP backend's descriptor synchronization. The fault controls measure oracle sensitivity,
