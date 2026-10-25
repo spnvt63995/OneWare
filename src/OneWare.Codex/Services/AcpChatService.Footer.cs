@@ -117,7 +117,7 @@ internal sealed partial class AcpChatService
         {
             if (!context.Active || context.Cancellation.IsCancellationRequested || _disposed ||
                 _session != context.OwnerSession || context.Epoch != Interlocked.Read(ref _conversationEpoch) ||
-                !context.Detached && !Current(context.RootTurn)) return;
+                !context.Detached && (context.RootTurn == null || !Current(context.RootTurn))) return;
             // A detached child may finish after the parent turn. Its request updates the same
             // footer, like Copilot's assistant usage events; its context window stays separate.
             RecordUsage(usage);

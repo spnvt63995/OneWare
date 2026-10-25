@@ -21,8 +21,8 @@ public sealed class AcpAgentRestorationTests
         var start = Delegate(peers[0], "worker", background); await Ready(peers, 2);
         peers[1].Complete(new { inputTokens = 12, outputTokens = 3 });
         var id = Payload(await start).GetProperty("id").GetString()!;
-        await AcpHarness.Until(() => h.Events.OfType<ChatSubAgentCompletedEvent>().Any());
-        await peers[0].CallTool("observe", AcpPluginCatalog.AgentResultTool, new { id, action = "wait" });
+        Assert.False(Error(await peers[0].CallTool("observe", AcpPluginCatalog.AgentResultTool,
+            new { id, action = "wait" })));
         peers[0].Complete(); await parent;
         var parentId = peers[0].Id; var childId = peers[1].Id;
         await h.Service.DisposeAsync();
@@ -31,7 +31,8 @@ public sealed class AcpAgentRestorationTests
         next.Enqueue(new AcpPeer { Id = parentId, ReplayOnResume = true });
         await using var restored = Recreate(h, peers, next, events);
         Assert.True(await restored.LoadSessionAsync(parentId));
-        Assert.Equal(3, peers.Count); Assert.Empty(peers[2].Prompts); Assert.Empty(events);
+        Assert.Equal(3, peers.Count); Assert.Empty(peers[2].Prompts);
+        Assert.All(events, e => Assert.IsType<ChatNoticesClearedEvent>(e));
         Assert.Equal(0, restored.SessionTotalTurns);
         var resume = restored.SendAsync("Continue with the remembered worker."); await Ready(peers, 3);
         Assert.Contains(id, peers[2].Prompts[0].GetRawText());

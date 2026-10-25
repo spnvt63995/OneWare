@@ -14,7 +14,7 @@ internal sealed partial class AcpChatService
         try
         {
             var conversation = run.Conversation;
-            _profile.SaveDelegation(new AcpSavedDelegation(1, run.OwnerSession, run.RootTurn.Directory,
+            _profile.SaveDelegation(new AcpSavedDelegation(1, run.OwnerSession, run.Directory,
                 conversation.Id, session, conversation.Definition, conversation.Description, conversation.Catalog,
                 conversation.Skills, conversation.Ancestors, conversation.Parent?.Id, run.Number,
                 retiring && run.Active ? "interrupted" : BackgroundStatus(run), run.Answer, run.Error));
@@ -67,12 +67,10 @@ internal sealed partial class AcpChatService
                         continue;
                     var conversation = new DelegatedConversation(record.Id, record.Definition, record.Description,
                         record.Catalog, record.Skills, record.Ancestors, parent) { SessionId = record.SessionId };
-                    var turn = new Prompt(_connection!, _generation, _session!, _cwd!, true, [], [],
-                        record.Definition.Model ?? _selection.Model, _toolsRevision, CancellationToken.None) { Finished = true };
                     var cancellation = new CancellationTokenSource();
                     if (record.State == "cancelled") cancellation.Cancel();
                     var interrupted = record.State is "running" or "interrupted";
-                    var run = new Delegation(this, turn, conversation, record.Turn, parent?.Run, false,
+                    var run = new Delegation(this, null, conversation, record.Turn, parent?.Run, false,
                         _conversationEpoch, cancellation)
                     {
                         Active = false, Answer = record.Answer, Error = interrupted

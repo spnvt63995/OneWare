@@ -7,13 +7,15 @@ namespace OneWare.Codex.Services;
 
 internal sealed partial class AcpChatService
 {
-    private sealed class Delegation(AcpChatService owner, Prompt rootTurn, DelegatedConversation conversation,
+    private sealed class Delegation(AcpChatService owner, Prompt? rootTurn, DelegatedConversation conversation,
         int number, Delegation? parent, bool background, long epoch,
         CancellationTokenSource cancellation)
     {
         public AcpChatService Owner { get; } = owner;
-        public Prompt RootTurn { get; } = rootTurn;
-        public string OwnerSession => RootTurn.Session;
+        // Restored results keep their owner and workspace without a live prompt.
+        public Prompt? RootTurn { get; } = rootTurn;
+        public string OwnerSession { get; } = rootTurn?.Session ?? owner._session!;
+        public string Directory { get; } = rootTurn?.Directory ?? owner._cwd!;
         public DelegatedConversation Conversation { get; } = conversation;
         public int Number { get; } = number;
         public string Id { get; } = number == 1 ? conversation.Id : conversation.Id + "-turn-" + number;
@@ -165,7 +167,7 @@ internal sealed partial class AcpChatService
         if (!context.Active || context.Cancellation.IsCancellationRequested || context.Owner._disposed ||
             context.Owner._session != context.OwnerSession ||
             context.Epoch != Interlocked.Read(ref context.Owner._conversationEpoch) ||
-            !context.Detached && !context.Owner.Current(context.RootTurn)) return;
+            !context.Detached && (context.RootTurn == null || !context.Owner.Current(context.RootTurn))) return;
         // Keep the original host responsible for rendering, progress and approval commands.
         // Child user echoes and Idle must never finish or append to the parent turn.
         ChatEvent? forwarded = value switch
