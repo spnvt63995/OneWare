@@ -1,5 +1,4 @@
 using System.Text.Json;
-using OneWare.Codex.Services;
 
 namespace OneWare.Codex.AdapterBoundaryTests;
 
@@ -46,9 +45,10 @@ internal sealed class PermissionFixture(bool anyPrefixFault = false)
             owner.Session != Current.Session || owner.Directory != Current.Directory) _grants.Clear();
         Current = owner;
     }
-    public PermissionAttempt Request(FunctionSpec function, BoundaryInvocation call, bool policyAllows = true)
+    // Product parser tests verify key extraction; lifecycle probes supply the resulting keys explicitly.
+    public PermissionAttempt Request(FunctionSpec function, BoundaryInvocation call, string[]? approvalKeys, bool policyAllows = true)
     {
-        var keys = ToolApproval.ForTool(function.Name, function.Name, call.Arguments)?.Keys.ToArray();
+        var keys = approvalKeys?.ToArray();
         var attempt = new PermissionAttempt(function, call with { Arguments = call.Arguments.Clone() }, keys);
         if (!policyAllows || call.Owner != Current || function.Name != call.Tool)
         {

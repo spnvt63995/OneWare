@@ -22,8 +22,9 @@ Passing a fixture does not establish equivalent behavior in the running ACP tran
 `tests/OneWare.Codex.AdapterContractTests` covers F01–F03, F05 and F09 with in-memory envelopes,
 logical clocks and fault-injection controls. These envelopes are not ACP wire messages.
 
-`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F06, F08 and F10–F12. It links the pure shared
-approval parser; the other lifecycle models remain synthetic. F07 is covered against the product
+`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F06, F08 and F10–F12 without compiling product
+source. Its approval lifecycle takes explicit approval keys; the product parser is covered in
+`tests/OneWare.Codex.UnitTests/ToolApprovalTests.cs`. F07 is also covered against the product
 project in `tests/OneWare.Codex.UnitTests/OneWareMcpResultTests.cs`. In-memory
 at-most-once behavior is not a durable crash-recovery ledger, and fixture edit review is not native UI.
 

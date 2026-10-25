@@ -1,5 +1,4 @@
 using System.Text.Json;
-using OneWare.Codex.Services;
 using Xunit;
 
 namespace OneWare.Codex.AdapterBoundaryTests;
@@ -7,6 +6,8 @@ namespace OneWare.Codex.AdapterBoundaryTests;
 [Trait("Contract", "F04")]
 public sealed class PermissionScopeTests
 {
+    private const string StatusKey = "tool:runTerminalCommand:git status";
+    private const string PwdKey = "tool:runTerminalCommand:pwd";
     private static FunctionSpec Terminal => BoundaryData.Tool("runTerminalCommand") with { ReadOnly = false, Confirmation = _ => "original check" };
     private static BoundaryInvocation Command(string command, string id = "a") =>
         BoundaryData.Call(id, "runTerminalCommand") with { Arguments = JsonSerializer.SerializeToElement(new { command }) };
@@ -27,7 +28,7 @@ public sealed class PermissionScopeTests
             ReadOnly = readOnly,
             Confirmation = hasCheck ? args => { checkedCount++; Assert.Equal("a.txt", args.GetProperty("path").GetString()); return asks ? "ask" : null; } : null
         };
-        var result = fixture.Request(function, BoundaryData.Call());
+        var result = fixture.Request(function, BoundaryData.Call(), ["tool:readFile"]);
         Assert.Equal(hasCheck ? 1 : 0, checkedCount);
         Assert.Equal(asks ? "pending" : "executed", result.State);
         Assert.Equal(asks ? 1 : 0, fixture.ApprovalRequests);
@@ -40,10 +41,10 @@ public sealed class PermissionScopeTests
     public void F04_OnceAndDenyNeverGrantTheNextCall(bool allow)
     {
         var f = new PermissionFixture();
-        Assert.True(f.Resolve(f.Request(Terminal, Command("git status")), allow ? PermissionAnswer.Once : PermissionAnswer.Deny));
+        Assert.True(f.Resolve(f.Request(Terminal, Command("git status"), [StatusKey]), allow ? PermissionAnswer.Once : PermissionAnswer.Deny));
         Assert.Equal(allow ? 1 : 0, f.Invocations.Count);
         Assert.Equal(0, f.GrantCount);
-        Assert.Equal("pending", f.Request(Terminal, Command("git status", "b")).State);
+        Assert.Equal("pending", f.Request(Terminal, Command("git status", "b"), [StatusKey]).State);
     }
 
     [Fact]
@@ -51,61 +52,51 @@ public sealed class PermissionScopeTests
     {
         var f = new PermissionFixture();
         var a = BoundaryData.Tool() with { Confirmation = _ => "ask" };
-        Assert.True(f.Resolve(f.Request(a, BoundaryData.Call()), PermissionAnswer.Chat));
-        Assert.Equal("executed", f.Request(a, BoundaryData.Call("b")).State);
+        Assert.True(f.Resolve(f.Request(a, BoundaryData.Call(), ["tool:readFile"]), PermissionAnswer.Chat));
+        Assert.Equal("executed", f.Request(a, BoundaryData.Call("b"), ["tool:readFile"]).State);
         var b = a with { Name = "editFile" };
-        Assert.Equal("pending", f.Request(b, BoundaryData.Call("c", "editFile")).State);
+        Assert.Equal("pending", f.Request(b, BoundaryData.Call("c", "editFile"), ["tool:editFile"]).State);
         Assert.Equal(1, f.GrantCount);
     }
 
     [Theory]
-    [InlineData("git diff --stat")]
-    [InlineData("git log -1")]
-    [InlineData("pwd")]
-    [InlineData("git status && pwd")]
-    [InlineData("git status | cat")]
-    public void F04_CommandGrantDoesNotExpandToAnotherPrefix(string other)
+    [InlineData("git diff --stat", new[] { "tool:runTerminalCommand:git diff" })]
+    [InlineData("git log -1", new[] { "tool:runTerminalCommand:git log" })]
+    [InlineData("pwd", new[] { PwdKey })]
+    [InlineData("git status && pwd", new[] { StatusKey, PwdKey })]
+    [InlineData("git status | cat", new[] { StatusKey, "tool:runTerminalCommand:cat" })]
+    public void F04_CommandGrantDoesNotExpandToAnotherPrefix(string other, string[] otherKeys)
     {
         var f = new PermissionFixture();
-        f.Resolve(f.Request(Terminal, Command("git status")), PermissionAnswer.Chat);
-        Assert.Equal("executed", f.Request(Terminal, Command("git status --short", "b")).State);
-        Assert.Equal("pending", f.Request(Terminal, Command(other, "c")).State);
+        f.Resolve(f.Request(Terminal, Command("git status"), [StatusKey]), PermissionAnswer.Chat);
+        Assert.Equal("executed", f.Request(Terminal, Command("git status --short", "b"), [StatusKey]).State);
+        Assert.Equal("pending", f.Request(Terminal, Command(other, "c"), otherKeys).State);
         Assert.Equal(2, f.Invocations.Count);
     }
 
     [Fact]
-    public void F04_CompoundCommandNeedsAllPrefixesAndPreservesTheOriginalLabel()
+    public void F04_CompoundCommandNeedsAllPrefixes()
     {
         var f = new PermissionFixture();
         var call = Command("git status && pwd");
-        var scope = ToolApproval.ForTool(Terminal.Name, Terminal.Name, call.Arguments)!;
-        Assert.Equal(new[] { "tool:runTerminalCommand:git status", "tool:runTerminalCommand:pwd" }, scope.Keys);
-        Assert.Equal("Allow \"git status\", \"pwd\" in this chat", scope.Label);
-        f.Resolve(f.Request(Terminal, call), PermissionAnswer.Chat);
-        Assert.Equal("executed", f.Request(Terminal, Command("pwd && git status --short", "b")).State);
-        Assert.Equal("pending", f.Request(Terminal, Command("pwd && whoami", "c")).State);
+        f.Resolve(f.Request(Terminal, call, [StatusKey, PwdKey]), PermissionAnswer.Chat);
+        Assert.Equal("executed", f.Request(Terminal, Command("pwd && git status --short", "b"), [PwdKey, StatusKey]).State);
+        Assert.Equal("pending", f.Request(Terminal, Command("pwd && whoami", "c"), [PwdKey, "tool:runTerminalCommand:whoami"]).State);
     }
 
-    [Theory]
-    [InlineData("sh -c 'pwd'")]
-    [InlineData("echo $(pwd)")]
-    [InlineData("pwd\nwhoami")]
-    [InlineData("find . -exec pwd ;")]
-    [InlineData("sudo git status")]
-    [InlineData("echo <(pwd)")]
-    [InlineData("echo 'unbalanced")]
-    [InlineData("")]
-    public void F04_IndeterminateCommandsHaveNoChatGrantButCanBeAllowedOnce(string command)
+    [Fact]
+    public void F04_UnavailableScopeCannotGrantChatButCanBeAllowedOnce()
     {
+        const string command = "sh -c 'pwd'";
         var f = new PermissionFixture();
-        var pending = f.Request(Terminal, Command(command));
+        var pending = f.Request(Terminal, Command(command), null);
         Assert.Null(pending.Keys);
         Assert.False(f.Resolve(pending, PermissionAnswer.Chat));
         Assert.Empty(f.Invocations);
         Assert.Equal(0, f.GrantCount);
         Assert.True(f.Resolve(pending, PermissionAnswer.Once));
         Assert.Single(f.Invocations);
-        Assert.Equal("pending", f.Request(Terminal, Command(command, "b")).State);
+        Assert.Equal("pending", f.Request(Terminal, Command(command, "b"), null).State);
     }
 
     [Theory]
@@ -116,22 +107,22 @@ public sealed class PermissionScopeTests
     public void F04_GrantsResetOutsideTheSameSessionControlledRefresh(string transition)
     {
         var f = new PermissionFixture();
-        f.Resolve(f.Request(Terminal, Command("git status")), PermissionAnswer.Chat);
+        f.Resolve(f.Request(Terminal, Command("git status"), [StatusKey]), PermissionAnswer.Chat);
         var owner = BoundaryData.Owner with { Connection = 2 };
         if (transition is "new-chat" or "controlled-foreign-session") owner = owner with { Session = "session-b" };
         f.Transition(owner, transition.StartsWith("controlled", StringComparison.Ordinal));
         Assert.Equal(0, f.GrantCount);
-        Assert.Equal("pending", f.Request(Terminal, Command("git status", "b") with { Owner = owner }).State);
+        Assert.Equal("pending", f.Request(Terminal, Command("git status", "b") with { Owner = owner }, [StatusKey]).State);
     }
 
     [Fact]
     public void F04_ControlledRefreshKeepsTheSameSessionGrant()
     {
         var f = new PermissionFixture();
-        f.Resolve(f.Request(Terminal, Command("git status")), PermissionAnswer.Chat);
+        f.Resolve(f.Request(Terminal, Command("git status"), [StatusKey]), PermissionAnswer.Chat);
         var owner = BoundaryData.Owner with { Connection = 2 };
         f.Transition(owner, controlledRefresh: true);
-        Assert.Equal("executed", f.Request(Terminal, Command("git status", "b") with { Owner = owner }).State);
+        Assert.Equal("executed", f.Request(Terminal, Command("git status", "b") with { Owner = owner }, [StatusKey]).State);
     }
 
     [Fact]
@@ -140,7 +131,7 @@ public sealed class PermissionScopeTests
         var called = new List<string>();
         var f = new PermissionFixture();
         var original = Terminal with { Handler = call => { called.Add(call.Arguments.GetProperty("command").GetString()!); return null; } };
-        var pending = f.Request(original, Command("git status"));
+        var pending = f.Request(original, Command("git status"), [StatusKey]);
         original = original with { Handler = _ => { called.Add("replacement"); return null; } };
         Assert.True(f.Resolve(pending, PermissionAnswer.Once));
         Assert.Equal(new[] { "git status" }, called);
@@ -154,7 +145,7 @@ public sealed class PermissionScopeTests
         var checks = 0;
         var f = new PermissionFixture();
         var tool = Terminal with { Confirmation = _ => { checks++; return "ask"; } };
-        Assert.Equal("denied", f.Request(tool, Command("git status"), policyAllows: false).State);
+        Assert.Equal("denied", f.Request(tool, Command("git status"), [StatusKey], policyAllows: false).State);
         Assert.Equal(0, checks);
         Assert.Equal(0, f.ApprovalRequests);
         Assert.Empty(f.Invocations);

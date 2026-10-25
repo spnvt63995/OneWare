@@ -8,8 +8,4 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     </PropertyGroup>
-    <!-- Compile the pure approval parser; other boundaries use isolated contract models. -->
-    <ItemGroup>
-        <Compile Include="..\..\src\OneWare.Codex\Services\ToolApproval.cs" Link="ProductBoundary\ToolApproval.cs" />
-    </ItemGroup>
 </Project>
