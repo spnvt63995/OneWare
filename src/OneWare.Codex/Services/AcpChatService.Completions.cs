@@ -49,7 +49,7 @@ internal sealed partial class AcpChatService
         _sendCancellation = cancellation;
         // Install cancellation before exposing Stop, including while the session is prepared.
         Emit(new ChatTurnStartedEvent());
-        _run = RunQueueAsync(input, cancellation);
+        _ = RunQueueAsync(input, cancellation);
     }
 
     private Prepared? NextInputLocked()

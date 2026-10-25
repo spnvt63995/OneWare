@@ -1,7 +1,6 @@
 using System.Text.Json;
 using OneWare.Essentials.Enums;
 using OneWare.Essentials.Models;
-using OneWare.Essentials.Services;
 
 namespace OneWare.Codex.Services;
 
@@ -11,7 +10,6 @@ internal sealed partial class AcpChatService
     private readonly SemaphoreSlim _steering = new(1);
     private readonly List<Prepared> _queue = [];
     private long _submissionEpoch;
-    private Task _run = Task.CompletedTask;
 
     private sealed record Prepared(
         string Text,
@@ -107,7 +105,7 @@ internal sealed partial class AcpChatService
                     var cancellation = CancellationTokenSource.CreateLinkedTokenSource(_lifetime.Token);
                     _sendCancellation = cancellation;
                     if (command != null) Emit(new ChatTurnStartedEvent());
-                    run = _run = RunQueueAsync(input, cancellation);
+                    run = RunQueueAsync(input, cancellation);
                 }
             }
 
