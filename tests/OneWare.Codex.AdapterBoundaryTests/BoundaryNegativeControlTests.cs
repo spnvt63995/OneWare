@@ -1,6 +1,4 @@
 using System.Text.Json;
-using Microsoft.Extensions.AI;
-using OneWare.Codex.Protocol;
 using Xunit;
 
 namespace OneWare.Codex.AdapterBoundaryTests;
@@ -32,16 +30,6 @@ public sealed class BoundaryNegativeControlTests
         Assert.Equal(1, next.Completions);
         Assert.Equal(0, oldRow.Completions);
         Assert.NotNull(Record.Exception(() => Assert.Equal(0, next.Completions)));
-    }
-
-    [Fact]
-    public void Detects_F07_DroppedImageInOtherwiseSuccessfulWireResult()
-    {
-        AIContent[] content = [new TextContent("a"), new DataContent(new byte[] { 1, 2 }, "image/png"), new TextContent("b")];
-        var original = JsonSerializer.SerializeToElement(OneWareMcpResult.Success(content));
-        var mutated = original.GetProperty("content").EnumerateArray().Where(x => x.GetProperty("type").GetString() != "image").ToArray();
-        Assert.Equal(2, mutated.Length);
-        Assert.NotNull(Record.Exception(() => Assert.Equal(3, mutated.Length)));
     }
 
     [Fact]

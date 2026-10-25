@@ -8,15 +8,15 @@ internal sealed partial class AcpChatService
     private IReadOnlyDictionary<string, AcpContextLimits>? _contextCatalog;
     private (string? Kind, string Details) _contextIdentity;
     private long? _contextWindow;
-    private AcpContextSize[] _contextSizes = [];
+    private ContextSizeOption[] _contextSizes = [];
 
-    public IReadOnlyList<AcpContextSize> ContextSizes => _contextSizes;
+    public IReadOnlyList<ContextSizeOption> ContextSizes => _contextSizes;
     public bool ShowContextSize => _contextSizes.Length > 1;
     public bool CanEditContextSize => CanEditOptions && _sending == 0;
-    public AcpContextSize? SelectedContextSize =>
+    public ContextSizeOption? SelectedContextSize =>
         _contextSizes.FirstOrDefault(x => x.Tier == _selection.ContextTier) ?? _contextSizes.FirstOrDefault();
     public string ContextSizeLabel => SelectedContextSize?.Label ?? "Context";
-    public Task SelectContextSizeAsync(AcpContextSize choice) => ChangeOptionsAsync("context_window", choice.Tier);
+    public Task SelectContextSizeAsync(ContextSizeOption choice) => ChangeOptionsAsync("context_window", choice.Tier);
 
     private async Task EnsureContextCatalogAsync(CancellationToken token)
     {
@@ -39,13 +39,13 @@ internal sealed partial class AcpChatService
         _contextIdentity == (_authKind, _accountDetails) && _contextCatalog != null &&
         _contextCatalog.TryGetValue(model, out var limits) ? limits : null;
 
-    private AcpContextSize[] ContextChoices(string model)
+    private ContextSizeOption[] ContextChoices(string model)
     {
         if (ContextLimits(model) is not { } limits) return [];
-        var standard = new AcpContextSize(AcpContextSize.FormatTokens(limits.DefaultTokens),
+        var standard = new ContextSizeOption(ContextSizeOption.FormatTokens(limits.DefaultTokens),
             ContextTierDefault, limits.DefaultTokens);
         return limits.MaximumTokens > limits.DefaultTokens
-            ? [standard, new(AcpContextSize.FormatTokens(limits.MaximumTokens), ContextTierLong, limits.MaximumTokens)]
+            ? [standard, new(ContextSizeOption.FormatTokens(limits.MaximumTokens), ContextTierLong, limits.MaximumTokens)]
             : [standard];
     }
 

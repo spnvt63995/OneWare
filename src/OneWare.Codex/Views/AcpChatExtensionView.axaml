@@ -80,7 +80,7 @@
                              SelectedItem="{Binding SelectedContextSize, Mode=OneWay}"
                              SelectionChanged="ContextSelectionChanged" PointerReleased="ContextPointerReleased">
                         <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="services:AcpContextSize">
+                            <DataTemplate x:DataType="services:ContextSizeOption">
                                 <TextBlock Text="{Binding Label}" />
                             </DataTemplate>
                         </ListBox.ItemTemplate>

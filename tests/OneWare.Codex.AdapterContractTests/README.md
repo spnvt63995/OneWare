@@ -40,5 +40,7 @@ Use `--filter FullyQualifiedName~ClassName` to select a fixture class.
 No real HTTP, CLI, AI inference, tool side effect, account, profile or history file is accessed by
 the tests. F03 is an in-memory at-most-once contract for one fixture lifetime, not a durable ledger
 or crash-recovery claim. F05 models a generic tool grant, not F04 terminal-prefix policy. F09 does not
-establish actual ACP load/resume compatibility or migrate any conversation. F04/F06–F08/F10–F12,
-native UI, actual ACP mapping and existing product guarantees remain separate work.
+establish actual ACP load/resume compatibility or migrate any conversation. Product regressions such
+as `AcpAdapterTests`, `AcpApprovalMemoryTests` and `AcpAgentRestorationTests` in
+`OneWare.Codex.UnitTests` exercise the service through its actual ACP message/HTTP boundary.
+They complement these models; neither suite alone establishes native UI or real-runtime compatibility.

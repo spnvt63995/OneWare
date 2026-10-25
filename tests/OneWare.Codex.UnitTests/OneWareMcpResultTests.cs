@@ -3,11 +3,10 @@ using Microsoft.Extensions.AI;
 using OneWare.Codex.Protocol;
 using Xunit;
 
-namespace OneWare.Codex.AdapterBoundaryTests;
+namespace OneWare.Codex.UnitTests;
 
-// Executes the current MCP codec linked from the product.
 [Trait("Contract", "F07")]
-public sealed class ResultEncodingTests
+public sealed class OneWareMcpResultTests
 {
     private static JsonElement Encode(object? value) => JsonSerializer.SerializeToElement(OneWareMcpResult.Success(value));
     private static JsonElement Items(JsonElement result) => result.GetProperty("content");
@@ -15,7 +14,7 @@ public sealed class ResultEncodingTests
     [Theory]
     [InlineData("image/png")]
     [InlineData("image/jpeg")]
-    public void F07_MixedContentKeepsOrderMimeAndExactBytes(string mime)
+    public void MixedContentKeepsOrderMimeAndExactBytes(string mime)
     {
         byte[] bytes = [0, 1, 2, 127, 128, 254, 255];
         AIContent[] source = [new TextContent("before"), new DataContent(bytes, mime), new TextContent("after")];
@@ -32,28 +31,37 @@ public sealed class ResultEncodingTests
     }
 
     [Fact]
-    public void F07_NullEmptyTypedAndEmptyUntypedHaveDistinctExistingMeanings()
+    public void ResultEncoderKeepsExactMixedTextImageAndErrorContracts()
     {
-        Assert.Equal("null", Items(Encode(null))[0].GetProperty("text").GetString());
-        Assert.Equal(0, Items(Encode(Array.Empty<AIContent>())).GetArrayLength());
-        Assert.Equal("[]", Items(Encode(Array.Empty<string>()))[0].GetProperty("text").GetString());
-        Assert.Equal("plain", Items(Encode(new TextContent("plain")))[0].GetProperty("text").GetString());
+        AIContent[] content = [new TextContent("before"), new DataContent(new byte[] { 0, 255 }, "image/png"), new TextContent("after")];
+        Assert.Equal("""{"isError":false,"content":[{"type":"text","text":"before"},{"type":"image","mimeType":"image/png","data":"AP8="},{"type":"text","text":"after"}]}""",
+            JsonSerializer.Serialize(OneWareMcpResult.Success(content)));
+        Assert.Equal("""{"isError":true,"content":[{"type":"text","text":"denied"}]}""",
+            JsonSerializer.Serialize(OneWareMcpResult.Failure("denied")));
     }
 
     [Fact]
-    public void F07_DomainErrorValueDoesNotPretendToBeATransportFailure()
+    public void EncoderRetainsJsonFallbackAndEmptyTypedContent()
     {
-        var source = new { success = false, error = "domain failure" };
-        var result = Encode(source);
-        Assert.Equal(JsonSerializer.Serialize(source), Items(result)[0].GetProperty("text").GetString());
-        Assert.False(result.GetProperty("isError").GetBoolean());
+        foreach (var value in new object?[] { null, true, "quoted", Array.Empty<string>(), new { result = "source text", error = (string?)null },
+                     new { success = false, error = "domain failure" } })
+        {
+            var result = JsonSerializer.SerializeToElement(OneWareMcpResult.Success(value));
+            Assert.False(result.GetProperty("isError").GetBoolean());
+            var item = Assert.Single(result.GetProperty("content").EnumerateArray());
+            Assert.Equal("text", item.GetProperty("type").GetString());
+            Assert.Equal(JsonSerializer.Serialize(value), item.GetProperty("text").GetString());
+        }
+        Assert.Empty(JsonSerializer.SerializeToElement(OneWareMcpResult.Success(Array.Empty<AIContent>())).GetProperty("content").EnumerateArray());
+        Assert.Equal("unquoted", JsonSerializer.SerializeToElement(OneWareMcpResult.Success(new TextContent("unquoted")))
+            .GetProperty("content")[0].GetProperty("text").GetString());
     }
 
     [Theory]
     [InlineData("denied")]
     [InlineData("invalid arguments")]
     [InlineData("invocation exception")]
-    public void F07_ExplicitFailureKeepsItsFlagAndExplanation(string explanation)
+    public void ExplicitFailureKeepsItsFlagAndExplanation(string explanation)
     {
         var result = JsonSerializer.SerializeToElement(OneWareMcpResult.Failure(explanation));
         Assert.True(result.GetProperty("isError").GetBoolean());
@@ -64,12 +72,12 @@ public sealed class ResultEncodingTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void F07_UnsupportedBinaryThrowsInsteadOfReturningEmptySuccess(bool mixed)
+    public void UnsupportedBinaryThrowsInsteadOfReturningEmptySuccess(bool mixed)
     {
         var binary = new DataContent(new byte[] { 1, 2, 3 }, "application/octet-stream");
         object source = mixed ? new AIContent[] { new TextContent("before"), binary, new TextContent("after") } : binary;
         var exception = Assert.Throws<NotSupportedException>(() => Encode(source));
-        Assert.Contains("DataContent", exception.Message);
+        Assert.Equal("Codex cannot return this tool content: DataContent.", exception.Message);
         var failure = JsonSerializer.SerializeToElement(OneWareMcpResult.Failure(exception.Message));
         Assert.True(failure.GetProperty("isError").GetBoolean());
         Assert.Contains("DataContent", Items(failure)[0].GetProperty("text").GetString());

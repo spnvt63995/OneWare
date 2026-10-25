@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <Import Project="..\..\build\props\XUnit.props" />
-    <Import Project="..\..\build\props\Microsoft.Extensions.AI.Abstractions.props" />
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <IsTestProject>true</IsTestProject>
@@ -9,9 +8,8 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     </PropertyGroup>
-    <!-- Compile the unchanged pure helpers; do not load the product, UI, profile or service graph. -->
+    <!-- Compile the pure approval parser; other boundaries use isolated contract models. -->
     <ItemGroup>
         <Compile Include="..\..\src\OneWare.Codex\Services\ToolApproval.cs" Link="ProductBoundary\ToolApproval.cs" />
-        <Compile Include="..\..\src\OneWare.Codex\Protocol\OneWareMcpResult.cs" Link="ProductBoundary\OneWareMcpResult.cs" />
     </ItemGroup>
 </Project>

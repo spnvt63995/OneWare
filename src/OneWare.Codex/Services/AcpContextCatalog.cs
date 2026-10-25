@@ -6,7 +6,7 @@ using System.Text.Json;
 namespace OneWare.Codex.Services;
 
 internal sealed record AcpContextLimits(long DefaultTokens, long MaximumTokens);
-internal sealed record AcpContextSize(string Label, string Tier, long Tokens)
+internal sealed record ContextSizeOption(string Label, string Tier, long Tokens)
 {
     public override string ToString() => Label;
 

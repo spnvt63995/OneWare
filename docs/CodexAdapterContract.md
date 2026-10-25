@@ -1,10 +1,10 @@
-# Adapter acceptance contract
+# Adapter contract fixtures
 
-The adapter contract separates transport behavior from shared OneWare chat behavior. Its synthetic
-fixtures exercise ownership, approval and replay invariants without using a real account or profile.
+The initial adapter contract separates transport behavior from shared OneWare chat behavior. Its
+synthetic fixtures exercise ownership, approval and replay invariants without using a real account or profile.
 Passing a fixture does not establish equivalent behavior in the running ACP transport or native UI.
 
-| Contract | Required boundary |
+| Contract | Modeled boundary |
 | --- | --- |
 | F01 | Match tool notifications and requests before invocation or approval, in either arrival order. |
 | F02 | Reject missing, mismatched, expired or foreign provider/profile/session/connection/prompt/call ownership. |
@@ -22,9 +22,20 @@ Passing a fixture does not establish equivalent behavior in the running ACP tran
 `tests/OneWare.Codex.AdapterContractTests` covers F01–F03, F05 and F09 with in-memory envelopes,
 logical clocks and fault-injection controls. These envelopes are not ACP wire messages.
 
-`tests/OneWare.Codex.AdapterBoundaryTests` covers the other boundaries. It links the pure shared
-approval parser and MCP result encoder; the other lifecycle models remain synthetic. In-memory
+`tests/OneWare.Codex.AdapterBoundaryTests` models F04, F06, F08 and F10–F12. It links the pure shared
+approval parser; the other lifecycle models remain synthetic. F07 is covered against the product
+project in `tests/OneWare.Codex.UnitTests/OneWareMcpResultTests.cs`. In-memory
 at-most-once behavior is not a durable crash-recovery ledger, and fixture edit review is not native UI.
 
 The fixture projects target .NET 10 and use xUnit. Their READMEs describe execution and coverage.
 Integration claims require separate checks of the actual transport and UI implementation.
+
+The original models are not a complete specification of the current product. For example, the F04
+model resets grants on a generic reconnect, while `AcpApprovalMemoryTests` verifies conversation-level
+approval persistence. The F10 snapshot model predates the live approval and model selection covered by
+`AcpLiveApprovalTests` and `AcpLiveModelTests`. F11 backend descriptor agreement and F12 historical
+aliases remain isolated model checks. Passing them does not prove those runtime capabilities.
+
+Product regression tests use `AcpHarness` to construct the real service and `AcpPeer` to supply
+deterministic ACP notifications and replies. MCP tool calls still cross the local HTTP endpoint.
+These helpers are test support, not a second implementation of the adapter.

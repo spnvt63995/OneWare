@@ -45,7 +45,7 @@ public partial class AcpChatExtensionView : UserControl
     private async void ContextSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (DataContext is AcpChatService { IsProjectingOptions: false } service &&
-            ContextSizeList.SelectedItem is AcpContextSize choice && choice != service.SelectedContextSize)
+            ContextSizeList.SelectedItem is ContextSizeOption choice && choice != service.SelectedContextSize)
             await service.SelectContextSizeAsync(choice);
     }
 

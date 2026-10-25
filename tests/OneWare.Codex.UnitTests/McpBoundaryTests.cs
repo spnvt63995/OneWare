@@ -60,37 +60,4 @@ public sealed class McpBoundaryTests
         Assert.True(removed.GetProperty("isError").GetBoolean());
         Assert.Single(calls);
     }
-
-    [Fact]
-    public void ResultEncoderKeepsExactMixedTextImageAndErrorContracts()
-    {
-        AIContent[] content = [new TextContent("before"), new DataContent(new byte[] { 0, 255 }, "image/png"), new TextContent("after")];
-        Assert.Equal("""{"isError":false,"content":[{"type":"text","text":"before"},{"type":"image","mimeType":"image/png","data":"AP8="},{"type":"text","text":"after"}]}""",
-            JsonSerializer.Serialize(OneWareMcpResult.Success(content)));
-        Assert.Equal("""{"isError":true,"content":[{"type":"text","text":"denied"}]}""",
-            JsonSerializer.Serialize(OneWareMcpResult.Failure("denied")));
-    }
-
-    [Fact]
-    public void EncoderRetainsJsonFallbackAndEmptyTypedContent()
-    {
-        foreach (var value in new object?[] { null, true, "quoted", new { result = "source text", error = (string?)null } })
-        {
-            var result = JsonSerializer.SerializeToElement(OneWareMcpResult.Success(value));
-            var item = Assert.Single(result.GetProperty("content").EnumerateArray());
-            Assert.Equal("text", item.GetProperty("type").GetString());
-            Assert.Equal(JsonSerializer.Serialize(value), item.GetProperty("text").GetString());
-        }
-        Assert.Empty(JsonSerializer.SerializeToElement(OneWareMcpResult.Success(Array.Empty<AIContent>())).GetProperty("content").EnumerateArray());
-        Assert.Equal("unquoted", JsonSerializer.SerializeToElement(OneWareMcpResult.Success(new TextContent("unquoted")))
-            .GetProperty("content")[0].GetProperty("text").GetString());
-    }
-
-    [Fact]
-    public void UnsupportedBinaryStillFailsInsteadOfBecomingSuccessfulJson()
-    {
-        var value = new DataContent(new byte[] { 1 }, "application/octet-stream");
-        var error = Assert.Throws<NotSupportedException>(() => OneWareMcpResult.Success(value));
-        Assert.Equal("Codex cannot return this tool content: DataContent.", error.Message);
-    }
 }

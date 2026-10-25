@@ -1,4 +1,3 @@
-using System.Reflection;
 using Avalonia.Headless.XUnit;
 using AvaloniaEdit.Document;
 using CommunityToolkit.Mvvm.Input;
@@ -10,18 +9,6 @@ using OneWare.Essentials.ViewModels;
 using Xunit;
 
 namespace OneWare.Codex.UnitTests;
-
-public class InterfaceStub : DispatchProxy
-{
-    public Func<string, object?[]?, object?> Handler { get; set; } = null!;
-    protected override object? Invoke(MethodInfo? method, object?[]? args) => Handler(method!.Name, args);
-    public static T Create<T>(Func<string, object?[]?, object?> handler) where T : class
-    {
-        var result = Create<T, InterfaceStub>();
-        ((InterfaceStub)(object)result).Handler = handler;
-        return result;
-    }
-}
 
 public sealed class DocumentToolTests : IDisposable
 {
