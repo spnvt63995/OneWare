@@ -4,16 +4,12 @@ internal sealed record Intent(bool Explicit, string? Value)
 {
     public static Intent Inherit => new(false, null);
 }
-internal sealed record SubmissionOptions(Intent Model, Intent Reasoning, string Agent, string Mode,
-    string Instructions, string[] Attachments)
-{
-    public SubmissionOptions Snapshot() => this with { Attachments = (string[])Attachments.Clone() };
-}
+internal sealed record SelectionIntent(Intent Model, Intent Reasoning);
 internal sealed record SessionIdentity(string Provider, string Profile, string Id, string Directory);
 internal sealed record ResumeTicket(SessionIdentity Identity, int Connection, int Generation);
 internal sealed record ResumeReply(string Id, string Directory, bool Success, string Model, string Reasoning);
 internal sealed record QueuedSubmission(SessionIdentity Identity, int Connection, int Prompt, bool Steer,
-    string Text, SubmissionOptions Options);
+    string Text);
 
 internal sealed class SessionFixture(bool replaceIntentFault = false, bool replaceHistoryFault = false)
 {
@@ -27,7 +23,7 @@ internal sealed class SessionFixture(bool replaceIntentFault = false, bool repla
     public bool Loaded { get; private set; }
     public string? Error { get; private set; }
     public IReadOnlyList<string> History => Array.AsReadOnly(_history);
-    public SubmissionOptions Saved { get; set; } = new(Intent.Inherit, Intent.Inherit, "agent-a", "ask", "instructions-a", ["image-a"]);
+    public SelectionIntent Saved { get; set; } = new(Intent.Inherit, Intent.Inherit);
     public (string Model, string Reasoning)? Observed { get; private set; }
     public List<ResumeTicket> Requests { get; } = [];
     public List<QueuedSubmission> Dispatched { get; } = [];
@@ -72,8 +68,9 @@ internal sealed class SessionFixture(bool replaceIntentFault = false, bool repla
         Reconnect();
     }
     public void NextPrompt() => Prompt++;
+    // Input ownership is independent of selection intent; product tests cover live options and content.
     public QueuedSubmission Queue(string text, bool steer = false) =>
-        new(Identity, Connection, Prompt, steer, text, Saved.Snapshot());
+        new(Identity, Connection, Prompt, steer, text);
     public bool Dispatch(QueuedSubmission submission)
     {
         var sameConnection = submission.Connection == Connection || _controlledConnections.Contains(submission.Connection);
@@ -85,11 +82,11 @@ internal sealed class SessionFixture(bool replaceIntentFault = false, bool repla
         Dispatched.Add(submission);
         return true;
     }
-    public Dictionary<string, string> OptionsPayload(QueuedSubmission submission)
+    public Dictionary<string, string> OptionsPayload()
     {
-        var result = new Dictionary<string, string> { ["agent"] = submission.Options.Agent, ["mode"] = submission.Options.Mode };
-        if (submission.Options.Model.Explicit) result["model"] = submission.Options.Model.Value!;
-        if (submission.Options.Reasoning.Explicit) result["reasoning"] = submission.Options.Reasoning.Value!;
+        var result = new Dictionary<string, string>();
+        if (Saved.Model.Explicit) result["model"] = Saved.Model.Value!;
+        if (Saved.Reasoning.Explicit) result["reasoning"] = Saved.Reasoning.Value!;
         return result;
     }
 }

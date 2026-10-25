@@ -2,14 +2,14 @@
 
 This isolated .NET 10/xUnit project models F04, F06, F08, F10 and F11 from
 [the adapter contract](../../docs/CodexAdapterContract.md).
-There are **75 contract cases and 5 fault-injection controls**.
+There are **73 contract cases and 5 fault-injection controls**.
 
 | Contract | Cases | Executed boundary |
 | --- | ---: | --- |
 | F04 | 18 | Fixed-owner approval decisions and grant matching with explicit approval-key inputs |
 | F06 | 14 | Invocation IDs, row ownership, client/service completion, echo suppression and in-memory edit review |
 | F08 | 10 | Same-ID resume, failed retry, foreign/stale response isolation and local history preservation |
-| F10 | 14 | Saved intent vs observed values; frozen Queue/Steer settings and scope checks |
+| F10 | 12 | Saved intent vs observed values; input identity, connection and prompt scope |
 | F11 | 19 | Handler rebind vs descriptor refresh, deferred synchronization, backend descriptor agreement and bounded retry |
 | Negative controls | 5 | One injected violation per modeled contract is detected by the corresponding invariant |
 
@@ -22,6 +22,15 @@ Conversation approval lifetime is tested against the real service in
 [`AcpApprovalMemoryTests`](../OneWare.Codex.UnitTests/AcpApprovalMemoryTests.cs): approvals survive
 transport replacement and reopening the same conversation, while new conversations and providers
 remain isolated. Those tests use deterministic ACP replies and the local MCP HTTP endpoint.
+
+Queue/Steer option timing is tested against the real service in
+[`AcpLiveModelTests`](../OneWare.Codex.UnitTests/AcpLiveModelTests.cs) and
+[`AcpLiveApprovalTests`](../OneWare.Codex.UnitTests/AcpLiveApprovalTests.cs): queued turns use the latest
+confirmed user model and reasoning, explicit agent overrides remain pinned, steering keeps the active
+turn's model, and subsequent tool requests use the live approval mode.
+[`AcpFeatureTests`](../OneWare.Codex.UnitTests/AcpFeatureTests.cs) covers queued content and agent
+snapshots, attachments, FIFO dispatch and steering ownership. The F10 model does not snapshot options
+or attachments.
 
 F07 result encoding is tested against the product project in
 [`OneWareMcpResultTests`](../OneWare.Codex.UnitTests/OneWareMcpResultTests.cs), alongside
@@ -49,6 +58,7 @@ F11's full descriptor agreement is a fixture acceptance condition; it does not v
 running ACP backend's descriptor synchronization. The fault controls measure oracle sensitivity,
 not reproduced product defects. These fixtures alone do not establish runtime ACP compatibility.
 
-F10 retains its original frozen submission options assumption. The current product supports live
-policy/model selection, covered by `AcpLiveApprovalTests` and `AcpLiveModelTests`.
-Do not change product behavior to match an older model.
+F10's explicit/inherited intent, review-required outcomes and controlled-refresh bridge remain isolated
+model conditions. They do not establish support for every inheritance or scope combination, a product
+review UI, or equivalent transport recovery. Current ACP selection and queue behavior must be verified
+against the product tests above. Do not change product behavior to match an older model.

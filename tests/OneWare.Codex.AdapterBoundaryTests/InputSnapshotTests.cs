@@ -22,34 +22,11 @@ public sealed class InputSnapshotTests
         ResumeContractTests.Load(f);
         Assert.Equal(saved, f.Saved);
         Assert.Equal(("observed-model", "observed-effort"), f.Observed);
-        var payload = f.OptionsPayload(f.Queue("question"));
+        var payload = f.OptionsPayload();
         Assert.Equal(modelExplicit, payload.ContainsKey("model"));
         Assert.Equal(effortExplicit, payload.ContainsKey("reasoning"));
         if (modelExplicit) Assert.Equal("chosen-model", payload["model"]);
         if (effortExplicit) Assert.Equal("low", payload["reasoning"]);
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public void F10_QueueAndSteerFreezeSubmissionSettingsAndAttachments(bool steer)
-    {
-        var f = new SessionFixture();
-        f.Saved = new(new(true, "model-a"), new(true, "low"), "agent-a", "agent", "instruction-a", ["image-a"]);
-        ResumeContractTests.Load(f);
-        var queued = f.Queue("original text", steer);
-        f.Saved.Attachments[0] = "mutated";
-        f.Saved = new(new(true, "model-b"), Intent.Inherit, "agent-b", "ask", "instruction-b", ["image-b"]);
-        Assert.True(f.Dispatch(queued));
-        var sent = Assert.Single(f.Dispatched);
-        Assert.Equal("original text", sent.Text);
-        Assert.Equal("model-a", sent.Options.Model.Value);
-        Assert.Equal("low", sent.Options.Reasoning.Value);
-        Assert.Equal("agent-a", sent.Options.Agent);
-        Assert.Equal("agent", sent.Options.Mode);
-        Assert.Equal("instruction-a", sent.Options.Instructions);
-        Assert.Equal(new[] { "image-a" }, sent.Options.Attachments);
-        Assert.Equal("/fixture/work", sent.Identity.Directory);
     }
 
     [Theory]
@@ -87,7 +64,7 @@ public sealed class InputSnapshotTests
         Assert.False(f.Dispatch(queued)); // Must wait for verified same-ID resume.
         ResumeContractTests.Load(f);
         Assert.True(f.Dispatch(queued));
-        Assert.Equal(queued.Options, Assert.Single(f.Dispatched).Options);
+        Assert.Equal(queued, Assert.Single(f.Dispatched));
         f.Reconnect();
         ResumeContractTests.Load(f);
         Assert.False(f.Dispatch(queued)); // The ordinary reconnect clears the controlled bridge.
