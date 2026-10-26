@@ -1,10 +1,68 @@
-﻿<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
-             x:Class="OneWare.Debugger.Views.DebuggerView" Background="{DynamicResource ThemeControlLowBrush}">
-    <Border Classes="empty-state">
-        <TextBlock Text="Coming Soon!" />
-    </Border>
+             xmlns:viewModels="clr-namespace:OneWare.Debugger.ViewModels"
+             xmlns:main="clr-namespace:OneWare.Debugger.Views.Main"
+             xmlns:views="clr-namespace:OneWare.Debugger.Views"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="260"
+             x:Class="OneWare.Debugger.Views.DebuggerView"
+             x:DataType="viewModels:DebuggerViewModel"
+             Background="{DynamicResource ThemeControlLowBrush}">
+
+    <DockPanel LastChildFill="True">
+
+        <Border DockPanel.Dock="Top" Classes="header" Padding="4">
+            <DockPanel LastChildFill="True">
+                <StackPanel Classes="toolbar">
+                    <Button Classes="icon" Command="{Binding StartCommand}" ToolTip.Tip="Start Debugging">
+                        <PathIcon Classes="warning" Data="{StaticResource Icon.Debug}" />
+                    </Button>
+                    <Button Classes="icon" Command="{Binding ContinueCommand}" ToolTip.Tip="Continue"
+                            IsVisible="{Binding !IsRunning}">
+                        <PathIcon Classes="success" Data="{StaticResource Icon.StepForward}" />
+                    </Button>
+                    <Button Classes="icon" Command="{Binding PauseCommand}" ToolTip.Tip="Pause"
+                            IsVisible="{Binding IsRunning}">
+                        <PathIcon Data="{StaticResource Icon.Pause}" />
+                    </Button>
+                    <Button Classes="icon" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
+                        <PathIcon Classes="error" Data="{StaticResource Icon.Stop}" />
+                    </Button>
+
+                    <Border Classes="divider vertical" Margin="4 4" />
+
+                    <Button Classes="icon" Command="{Binding StepOverCommand}" ToolTip.Tip="Step Over">
+                        <PathIcon Data="{StaticResource Icon.DebugStepOver}" />
+                    </Button>
+                    <Button Classes="icon" Command="{Binding StepIntoCommand}" ToolTip.Tip="Step Into">
+                        <PathIcon Data="{StaticResource Icon.DebugStepInto}" />
+                    </Button>
+                    <Button Classes="icon" Command="{Binding StepOutCommand}" ToolTip.Tip="Step Out">
+                        <PathIcon Data="{StaticResource Icon.DebugStepOut}" />
+                    </Button>
+
+                    <Border Classes="divider vertical" Margin="4 4" />
+
+                    <TabStrip Classes="pills" SelectedIndex="{Binding MainPanel.SelectedTabIndex}">
+                        <TabStripItem Content="Variables" />
+                        <TabStripItem Content="Registers" />
+                        <TabStripItem Content="Memory" />
+                        <TabStripItem Content="Breakpoints" />
+                        <TabStripItem Content="Console" />
+                    </TabStrip>
+                </StackPanel>
+
+                <!-- Rightmost so it stays put while the status text changes length. -->
+                <Panel DockPanel.Dock="Right" Margin="8 0 0 0" IsVisible="{Binding MainPanel.ShowsValueFormat}">
+                    <views:ValueFormatBar DataContext="{Binding MainPanel.ValueFormat}" />
+                </Panel>
+
+                <TextBlock Classes="muted" Margin="12 0 4 0" HorizontalAlignment="Right" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" Text="{Binding StatusText}" />
+            </DockPanel>
+        </Border>
+
+        <main:MainPanelView DataContext="{Binding MainPanel}" />
+    </DockPanel>
 </UserControl>

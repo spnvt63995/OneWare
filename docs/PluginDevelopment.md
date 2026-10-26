@@ -6,9 +6,10 @@ and how UniversalFpgaProject support is wired so you can extend it safely.
 ## Quick start
 
 1) Create a class library that references `OneWare.Essentials`.
-2) Implement a module by deriving from `OneWare.Essentials.Services.OneWareModuleBase`.
-3) Add a `compatibility.txt` file next to your plugin assemblies.
-4) Package the plugin as a folder (assemblies + `compatibility.txt`) and install it via the plugin manager.
+2) Implement a GUI module by deriving from `OneWare.Essentials.Services.OneWareModuleBase`.
+3) Optionally implement a CLI module by deriving from `OneWare.Essentials.Services.OneWareCliModuleBase`.
+4) Add a `compatibility.txt` file next to your plugin assemblies.
+5) Package the plugin as a folder (assemblies + `compatibility.txt`) and install it via the plugin manager.
 
 Minimal module example:
 
@@ -34,6 +35,33 @@ public sealed class MyPluginModule : OneWareModuleBase
                 if (selected is [IProjectFile])
                     items.Add(new MenuItemModel("MyAction") { Header = "My Action" });
             });
+    }
+}
+```
+
+Minimal CLI module example:
+
+```csharp
+using System.CommandLine;
+using OneWare.Essentials.Services;
+
+namespace MyCompany.MyPlugin;
+
+public sealed class MyPluginCliModule : OneWareCliModuleBase
+{
+    public override IReadOnlyList<Command> RegisterCommands(IServiceProvider serviceProvider)
+    {
+        var helloCommand = new Command("myplugin", "Commands for MyPlugin");
+        var pingCommand = new Command("ping", "Simple health check");
+
+        pingCommand.SetAction((_, _) =>
+        {
+            Console.WriteLine("pong");
+            return Task.FromResult(0);
+        });
+
+        helloCommand.Subcommands.Add(pingCommand);
+        return [helloCommand];
     }
 }
 ```
@@ -92,17 +120,49 @@ You can generate `compatibility.txt` automatically during build by marking depen
 - A plugin must include a `compatibility.txt` file at its root. It lists assembly dependencies and
   versions using `AssemblyName : Version` lines. The check is enforced by
   `OneWare.Essentials.PackageManager.Compatibility.PluginCompatibilityChecker`.
-- Modules are discovered by scanning assemblies for `IOneWareModule` implementations.
-- If `IOneWareModule.RegisterServices` adds services, they are injected into the main container
-  before module initialization. If the app is already running, modules are initialized immediately.
+- GUI modules are discovered by scanning assemblies for `IOneWareModule` implementations.
+- CLI modules are discovered by scanning assemblies for `IOneWareCliModule` implementations.
+- `IOneWareModule.RegisterServices` contributes services to the desktop app container before
+  `Initialize(IServiceProvider)` runs.
+- `IOneWareCliModule.RegisterServices` contributes services to the CLI container before
+  `RegisterCommands(IServiceProvider)` runs.
+- A single assembly may contain both GUI and CLI modules when the feature supports both surfaces.
 
 ## Module lifecycle and dependency injection
 
-`IOneWareModule` is the entry point for plugins:
+`IOneWareModule` is the entry point for desktop/UI plugins:
 
 - `RegisterServices(IServiceCollection services)` lets you register your own services.
 - `Initialize(IServiceProvider serviceProvider)` runs after services are registered.
 - `Dependencies` allows declaring other module IDs to load before yours.
+
+`IOneWareCliModule` is the entry point for CLI plugins:
+
+- `RegisterServices(IServiceCollection services)` lets you register services needed by CLI commands.
+- `RegisterCommands(IServiceProvider serviceProvider)` returns the commands your module contributes.
+- `Dependencies` allows declaring other CLI module IDs that must load first.
+- CLI module types must be public, non-abstract, and expose a parameterless constructor so the CLI loader can discover and instantiate them.
+- Top-level command names must be plain words (letters, digits, `-`, `_`). The Studio executable only switches to
+  CLI mode when the first argument looks like a command name, so names containing `.`, `/` or `:` would be treated
+  as a file to open in the GUI.
+
+CLI modules are intentionally headless: they should not depend on Avalonia UI state, windows, or
+desktop-only lifecycles. Prefer shared services for reusable logic and keep CLI-specific behavior in
+the command layer.
+
+To update a running Studio from a CLI command, register a handler in your GUI module and send the command from
+the CLI module. Handlers run on the UI thread; prefix command names with your plugin id to avoid collisions.
+
+```csharp
+// GUI module (Initialize)
+serviceProvider.Resolve<IIpcCommandService>()
+    .RegisterCommand("myplugin-reload", argument => ReloadAsync(argument));
+
+// CLI command
+var channel = StudioInstanceChannel.Default;
+if (channel.IsStudioRunning())
+    await channel.SendCommandAsync("myplugin-reload", "some-argument", cancellationToken);
+```
 
 Use `serviceProvider.Resolve<T>()` or `ContainerLocator.Current` to resolve OneWare services.
 
@@ -148,6 +208,21 @@ The following sections document the core services and their key functions.
 - `Dependencies`: other module IDs that must load before this one.
 - `RegisterServices(IServiceCollection)`: add services to the DI container.
 - `Initialize(IServiceProvider)`: run after services are registered.
+
+#### `IOneWareCliModule` (src/OneWare.Essentials/Services/IOneWareCliModule.cs)
+
+- `Id`: module identifier (defaults to class name in `OneWareCliModuleBase`).
+- `Dependencies`: other CLI module IDs that must load before this one.
+- `RegisterServices(IServiceCollection)`: add services to the CLI DI container.
+- `RegisterCommands(IServiceProvider)`: return top-level CLI commands for registration.
+- Module type: must be public, non-abstract, and expose a parameterless constructor for CLI discovery.
+
+#### `IIpcCommandService` (src/OneWare.Essentials/Services/IIpcCommandService.cs)
+
+- `RegisterCommand(name, handler)`: handles a command sent to the running Studio (UI thread, optional string argument).
+- `ExecuteAsync(name, argument)`: runs a registered handler; returns false for unknown commands.
+- Send commands with `StudioInstanceChannel.Default.SendCommandAsync` (`src/OneWare.Essentials/Helpers/StudioInstanceChannel.cs`),
+  which also offers `IsStudioRunning()` and `WaitForExitAsync()`.
 
 #### `IPluginService` (src/OneWare.Essentials/Services/IPluginService.cs)
 
@@ -200,6 +275,38 @@ Provides all app path locations: `AppDataDirectory`, `ProjectsDirectory`, `Packa
 - `RegisterProjectManager(id, manager)`: register a project type.
 - `GetManager(id)` / `GetManagerByExtension(extension)`: resolve project manager by ID/extension.
 
+#### `IProjectActionService` (src/OneWare.Essentials/ProjectActions/IProjectActionService.cs)
+
+Project-type independent Build / Clean / Run / Program / Debug actions. The shared toolbar, the **Build** menu
+(`Ctrl+Shift+B` build, `F5` debug, `Ctrl+F5` run) and the debugger panel all run through it.
+
+- `RegisterProvider<T>()` / `RegisterProvider(provider)`: add an `IProjectActionProvider` for your project type.
+  A provider implements `Supports(project, kind)` (cheap, called for UI state) and
+  `ExecuteAsync(ProjectActionRequest)` (honour `request.CancellationToken`).
+- `Priority`: the highest-priority supporting provider wins; generic fallbacks use negative values
+  (the debugger registers a `-100` Debug fallback for projects with a target preparer or a declared
+  `Debugger/Executable`).
+- `UsesSharedToolBar`: return `false` if your project type has its own toolbar (FPGA projects do); the actions
+  remain available through the Build menu and `ExecuteAsync`.
+- `ExecuteAsync(kind, project?)`: runs on the active project by default. Build, Run and Debug save open files
+  first. Only one top-level action runs at a time; calls made from inside a provider (e.g. Debug triggering
+  Build) run as part of the outer action.
+- Return `BuildArtifact`s from Build; `GetArtifacts(project)` exposes them, and the debugger uses the
+  first `Executable`/`Elf` artifact instead of searching the project folder.
+
+C/C++ software projects (`.swproj`, module `src/OneWare.SoftwareProjectSystem`, desktop only) are the reference
+provider. The project file stores `buildSystem` (`simple` calls the compiler directly with incremental,
+parallel builds; `cmake` uses the project's `CMakeLists.txt`), `kit`, `configuration` (`Debug`/`Release`), `output`,
+`cStandard`/`cxxStandard`, `includeDirectories`, `defines`, `compilerFlags`, `linkerFlags`, `libraries`,
+`cmakeArguments` and `runArguments`, plus the usual `include`/`exclude` file patterns and `compileExcluded` (files the
+simple build skips; toggled with "Exclude from build" in the explorer). Output goes to `build/<configuration>`, and `build/compile_commands.json`
+is written for clangd. Toolchain kits (host GCC/Clang and cross GCCs such as `arm-none-eabi` found on `PATH`)
+come from `ToolchainKitService` in that module (`RegisterKit` adds more; it isn't part of the plugin API yet).
+Compiler errors appear in the error list under the source `C/C++ Build`.
+Chat agents get `cpp_list_options`, `cpp_create_project`, `cpp_open_project` and `cpp_get_project_overview` from this
+module, and `folder_open_project` / `folder_create_project` from `OneWare.FolderProjectSystem`. New projects are
+created through `SoftwareProjectFactory`, which the creator dialog uses too.
+
 #### `IProjectSettingsService` (src/OneWare.Essentials/Services/IProjectSettingsService.cs)
 
 - `AddProjectSetting`, `AddProjectSettingIfNotExists`: register project-specific settings.
@@ -232,6 +339,12 @@ Provides all app path locations: `AppDataDirectory`, `ProjectsDirectory`, `Packa
 - `RegisterService(type, workspaceDependent, supportedFileTypes)`: LSP service registration.
 - `RegisterStandaloneTypeAssistance(type, supportedFileTypes)`: editor assistance only.
 - `GetLanguageService(fullPath)`, `GetTypeAssistance(IEditor)`: resolve per-file services.
+
+#### `IEditorHoverService` (src/OneWare.Essentials/Services/IEditorHoverService.cs)
+
+- `RegisterProvider(IEditorHoverProvider)`: editors ask providers in registration order before the language
+  server hover. A provider gets an `EditorHoverRequest` (editor, offset, word) and returns a control or view
+  model for the popup, or `null` to pass. The debugger uses it to show variable values while a session is halted.
 
 #### `IErrorService` (src/OneWare.Essentials/Services/IErrorService.cs)
 
@@ -600,7 +713,9 @@ Use `IWindowService.RegisterUiExtension` to add UI to these extension points:
 ## Suggested validation and troubleshooting
 
 - Ensure `compatibility.txt` matches the core dependency versions.
-- Verify your module class is public and implements `IOneWareModule`.
+- Verify your module class is public and implements `IOneWareModule` and/or `IOneWareCliModule`.
+- If CLI commands do not appear under `oneware --help`, verify the assembly is copied with the
+  plugin and the command name does not collide with an existing top-level command or alias.
 - If your UI does not appear, confirm you used the correct UI extension key.
 - For FPGA tooling, confirm your toolchain ID matches the project `toolchain` property.
 
