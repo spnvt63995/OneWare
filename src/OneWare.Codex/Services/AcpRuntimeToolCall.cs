@@ -36,7 +36,10 @@ internal sealed class AcpRuntimeToolCall
         if (Value(update, "rawOutput", out var output))
         {
             var raw = output.ToString();
-            _rawOutput = raw.Length <= 4000 ? raw : "Tool output exceeds the text preview limit.";
+            // Keep the same text preview as Copilot without dumping oversized opaque payloads.
+            _rawOutput = output.ValueKind == JsonValueKind.String
+                ? Limit(raw, 4000)
+                : raw.Length <= 4000 ? raw : "Tool output exceeds the text preview limit.";
             _preferContent = false;
             _additionalOutput = Value(output, "error", out var error) ? Limit(error.ToString(), 4000) : null;
             // The installed runtime forwards MCP results in this explicit envelope. Do not

@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Text.Json;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Microsoft.Extensions.AI;
 using OneWare.Chat.Services;
 using OneWare.Chat.ViewModels;
 using OneWare.Chat.ViewModels.ChatMessages;
@@ -24,6 +26,28 @@ public sealed class AcpRichToolResultsTests
     {
         Dispatcher.UIThread.RunJobs();
         return Assert.Single(session.Messages.OfType<ChatMessageToolViewModel>());
+    }
+
+    [Theory]
+    [InlineData(3999)]
+    [InlineData(4000)]
+    [InlineData(4001)]
+    public void RawStringsKeepTheSameTextPreviewAsStandardAndMcpResults(int length)
+    {
+        const string prefix = "First line\n한글🙂\r\n";
+        var text = prefix + new string('x', length - prefix.Length);
+        var raw = new AcpRuntimeToolCall();
+        raw.Update(AcpPeer.Json(new { rawOutput = text }));
+        var standard = new AcpRuntimeToolCall();
+        standard.Update(AcpPeer.Json(new { content = new[] { Text(text) } }));
+        var mcp = new AcpRuntimeToolCall();
+        mcp.Update(AcpPeer.Json(new { rawInput = new { server = "fixture", tool = "text" },
+            rawOutput = new { result = new { content = new[] { new { type = "text", text } } } } }));
+
+        // Copilot's tool-result preview retains the first 4,000 characters and an ellipsis.
+        Assert.Equal(length <= 4000 ? text : text[..4000] + "…", raw.Output);
+        Assert.Equal(standard.Output, raw.Output);
+        Assert.Equal(mcp.Output, raw.Output);
     }
 
     [Fact]
@@ -67,14 +91,18 @@ public sealed class AcpRichToolResultsTests
         Assert.Single(call.Content!, x => x.IsImage);
         Assert.DoesNotContain(call.Content!, x => x.Text == "alternate");
         var failure = new AcpRuntimeToolCall();
-        failure.Update(AcpPeer.Json(new { content = Mixed(), rawOutput = "Partial failure", status = "failed" }));
-        Assert.Equal("Partial failure", failure.Content!.Last().Text);
+        var error = "Partial failure\n" + new string('x', 5000);
+        failure.Update(AcpPeer.Json(new { content = Mixed(), rawOutput = error, status = "failed" }));
+        Assert.Equal(error[..4000] + "…", failure.Content!.Last().Text);
     }
 
     [Fact]
     public void UnsupportedMissingMalformedAndOverLimitResultsExplainWhyWithoutRawPayloads()
     {
         var call = new AcpRuntimeToolCall();
+        call.Update(AcpPeer.Json(new { rawOutput = new { data = new string('x', 5000) } }));
+        Assert.Equal("Tool output exceeds the text preview limit.", call.Output);
+        Assert.Null(call.Content);
         call.Update(AcpPeer.Json(new { content = new object[]
         {
             Wrap(new { type = "image", mimeType = "image/png", data = "invalid" }),
@@ -98,6 +126,71 @@ public sealed class AcpRichToolResultsTests
         byte[] jpegHeader = [255, 216, 255, 192, 0, 17, 8, 0, 1, 0, 1, 3, 1, 17, 0, 2, 17, 0, 3, 17, 0, 255, 217];
         Assert.Null(ChatToolContentLimits.ValidateImage(image with { MimeType = "image/jpeg", Data = Convert.ToBase64String(jpegHeader) }, out _, out width, out height));
         Assert.Equal(1, width); Assert.Equal(1, height);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task HostToolResultsKeepFullTextThroughMcpAndHistory(bool typedContent)
+    {
+        var output = string.Concat(Enumerable.Range(0, 300)
+            .Select(i => $"{i:D3}: {new string('x', 64)} 한글🙂\r\n")) + "END\n끝 ✅";
+        await using var h = new AcpHarness();
+        h.Provider.RegisterFunction(new OneWareAiFunction
+        {
+            Name = "long_result", Description = "Returns multiline tool output", IsReadOnly = true,
+            Handler = (Func<string, string>)(value => value),
+            InvocationHandler = (context, _, _) =>
+            {
+                context.ReportProgress(output);
+                return ValueTask.FromResult<object?>(typedContent ? new TextContent(output) : output);
+            }
+        });
+        var host = Host(h); var session = host.CurrentSession!;
+        await AcpHarness.Until(() => session.IsConnected);
+        session.CurrentMessage = "Compare long tool results";
+        var send = session.SendCommand.ExecuteAsync(null);
+        await h.Peer.PromptStarted.Task;
+
+        // Copilot receives this same registered AIFunction; ACP adds the MCP transport around it.
+        var function = h.Provider.GetTools().OfType<AIFunction>().Single(x => x.Name == "long_result");
+        var direct = await function.InvokeAsync(new AIFunctionArguments { ["value"] = "same",
+            Context = new Dictionary<object, object?>
+            {
+                [typeof(OneWareInvocation)] = new OneWareInvocation(h.Peer.Id, "direct")
+            } });
+        Assert.Equal(output, typedContent ? Assert.IsType<TextContent>(direct).Text : Assert.IsType<string>(direct));
+        var response = await h.Peer.CallTool("acp", "long_result", new { value = "same" });
+        Assert.False(response.GetProperty("isError").GetBoolean());
+        var text = Assert.Single(response.GetProperty("content").EnumerateArray()).GetProperty("text").GetString();
+        Assert.Equal(output, typedContent ? text : JsonSerializer.Deserialize<string>(text!));
+
+        // The runtime's echo must not replace host progress with a bounded runtime preview.
+        h.Peer.Update(new { sessionUpdate = "tool_call_update", toolCallId = "acp", status = "completed",
+            content = new[] { Text(output) }, rawOutput = new { result = response } });
+        h.Peer.Complete(); await send;
+        Dispatcher.UIThread.RunJobs();
+        var rows = session.Messages.OfType<ChatMessageToolViewModel>().ToArray();
+        Assert.Equal(2, rows.Length);
+        Assert.All(rows, row =>
+        {
+            Assert.Equal(output, row.ToolOutput);
+            Assert.Null(row.ToolContent);
+            Assert.True(row.IsSuccessful);
+        });
+        Assert.Empty(h.Events.OfType<ChatToolExecutionUpdateEvent>());
+        host.SaveState();
+
+        var id = h.Service.CurrentSessionId!; await h.Service.DisposeAsync();
+        var peer = new AcpPeer { Id = id };
+        await using var service = new AcpChatService(h.Host, h.Profile, () => h.Agent, () => peer);
+        var restored = Host(h, service).CurrentSession!;
+        await AcpHarness.Until(() => restored.IsConnected && peer.Resumes > 0);
+        var restoredRows = restored.Messages.OfType<ChatMessageToolViewModel>().ToArray();
+        Assert.Equal(2, restoredRows.Length);
+        Assert.All(restoredRows, row => Assert.Equal(output, row.ToolOutput));
+        Assert.Equal(2, h.Starts.Count);
+        Assert.Empty(peer.Prompts);
     }
 
     [AvaloniaFact]
@@ -175,6 +268,55 @@ public sealed class AcpRichToolResultsTests
             .Items.OfType<ChatMessageToolViewModel>());
         Assert.Equal(child.ToolContent, restoredChild.ToolContent);
         Assert.Empty(restoredPeer.Prompts);
+    }
+
+    [AvaloniaFact]
+    public async Task RawTextPreviewReachesParentAndChildCardsAndSurvivesReopen()
+    {
+        const string prefix = "First line\n한글🙂\r\n";
+        var visible = prefix + new string('x', 4000 - prefix.Length);
+        var output = visible + "\nOMITTED_TAIL";
+        var expected = visible + "…";
+        var peers = new List<AcpPeer>();
+        await using var h = new AcpHarness(factory: () => { var p = new AcpPeer(); peers.Add(p); return p; });
+        h.Provider.RegisterAgent(new OneWareAiAgent
+        {
+            Name = "inspector", DisplayName = "Inspector", Description = "Inspect the fixture",
+            Instructions = "Inspect", Model = "gpt-6-luna"
+        });
+        var host = Host(h); var session = host.CurrentSession!;
+        await AcpHarness.Until(() => session.IsConnected);
+        session.CurrentMessage = "Compare runtime text previews";
+        var send = session.SendCommand.ExecuteAsync(null);
+        await AcpHarness.Until(() => peers.Count == 1 && peers[0].Prompts.Count == 1);
+        peers[0].Update(new { sessionUpdate = "tool_call", toolCallId = "text", title = "Parent text",
+            status = "in_progress", rawOutput = output });
+        peers[0].Update(new { sessionUpdate = "tool_call_update", toolCallId = "text", status = "completed" });
+        var delegated = peers[0].CallTool("delegate", AcpPluginCatalog.DelegateTool,
+            new { agent = "inspector", task = "Inspect" });
+        await AcpHarness.Until(() => peers.Count == 2 && peers[1].Prompts.Count == 1);
+        peers[1].Update(new { sessionUpdate = "tool_call", toolCallId = "text", title = "Child text",
+            status = "completed", rawOutput = output });
+        peers[1].Complete(); await delegated;
+        peers[0].Complete(); await send;
+        var parent = Tool(session);
+        var child = Assert.Single(Assert.Single(session.Messages.OfType<ChatMessageSubAgentViewModel>())
+            .Items.OfType<ChatMessageToolViewModel>());
+        Assert.Equal(expected, parent.ToolOutput);
+        Assert.Equal(expected, child.ToolOutput);
+        Assert.True(parent.IsSuccessful); Assert.True(child.IsSuccessful);
+        host.SaveState();
+
+        var id = h.Service.CurrentSessionId!; await h.Service.DisposeAsync();
+        var peer = new AcpPeer { Id = id };
+        await using var service = new AcpChatService(h.Host, h.Profile, () => h.Agent, () => peer);
+        var restored = Host(h, service).CurrentSession!;
+        await AcpHarness.Until(() => restored.IsConnected && peer.Resumes > 0);
+        Assert.Equal(expected, Tool(restored).ToolOutput);
+        var restoredChild = Assert.Single(Assert.Single(restored.Messages.OfType<ChatMessageSubAgentViewModel>())
+            .Items.OfType<ChatMessageToolViewModel>());
+        Assert.Equal(expected, restoredChild.ToolOutput);
+        Assert.Empty(peer.Prompts);
     }
 
     [AvaloniaFact]
