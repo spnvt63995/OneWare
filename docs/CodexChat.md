@@ -83,11 +83,40 @@ dedicated timeline card.
 ## Development entry points
 
 - `src/OneWare.Codex/CodexModule.cs`: provider and managed-runtime registration.
-- `src/OneWare.Codex/Services/AcpChatService*.cs`: sessions, prompts, approvals, tools and delegation.
-- `src/OneWare.Codex/Services/AcpProfile*.cs`: profile-scoped settings and persistence.
+- `src/OneWare.Codex/Services/AcpChatService.cs`: sessions, prompts, approvals, tools and delegation.
+- `src/OneWare.Codex/Services/AcpProfile.cs`: profile-scoped settings and persistence.
 - `src/OneWare.Chat`: shared composer, history, tools and agent UI.
 - `tests/OneWare.Codex.UnitTests`: focused provider tests.
 - [Adapter contract](CodexAdapterContract.md): independent synthetic transport-boundary fixtures.
+
+### Service structure
+
+`AcpChatService.cs` contains the provider's conversation lifecycle, prompt submission, options,
+account operations, commands, delegation, user decisions, incoming events and host tool calls.
+These operations share one conversation's state and cancellation. The service is kept in one file,
+as in `CopilotChatService`; `PendingDecision<T>` is a private helper for its approval and question
+callbacks. `CodexModule.Initialize` registers the provider and its shutdown task.
+
+Each chat view and delegated child owns its ACP connection and active prompt. The session family
+shares account operations and conversation-keyed approval memory. Moving members between files does
+not change that ownership.
+
+The other files group state and integration responsibilities. They are not additional registered chat
+services, and a separate type does not necessarily require a separate file.
+
+| Type or area | Responsibility and reason to keep it separate from conversation orchestration |
+| --- | --- |
+| `AcpAttachments` | Observable composer draft and editor subscriptions, also consumed directly by the attachment view |
+| `AcpRuntimeToolCall` | One runtime tool call's accumulated input, output and rich-content updates |
+| `AcpPluginCatalog` | Agent/skill snapshots used by prompt preparation, delegation and saved child conversations |
+| `AcpContextCatalog` | Codex model-catalog process invocation and parsing, including timeout and output limits |
+| `OneWareHost` | Calls into OneWare's tool registry, workspace context, confirmations and UI thread |
+| `AcpRuntime` | Managed installation state and executable/profile paths, independent of an active turn |
+| `AcpProfile` | Profile-scoped session bindings, selections and delegated-conversation persistence |
+| `ToolApproval` | Approval-key parsing corresponding to the separate upstream `CopilotToolApproval` helper |
+| `Protocol/` | JSON-RPC process connection, local HTTP MCP endpoint, transport contract and result envelope |
+
+Shared chat rendering and host tool behavior continue to live in the existing OneWare modules.
 
 Build and test using the repository's [contribution guide](../CONTRIBUTING.md).
 The ACP provider tests use isolated profiles so fixture state does not affect normal conversations.
