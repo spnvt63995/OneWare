@@ -109,6 +109,10 @@ public sealed class AcpAdapterTests
         catch (HttpRequestException)
         {
         }
+        catch (JsonException ex) when (ex.LineNumber == 0 && ex.BytePositionInLine == 0)
+        {
+            // The closed endpoint may return an empty body instead of a transport error.
+        }
 
         Assert.Empty(h.Starts);
         h.Peer.ResetPrompt();

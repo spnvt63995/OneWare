@@ -44,7 +44,6 @@ internal sealed class AcpChatService : ObservableObject, IChatServiceWithParalle
     private readonly Func<ChatAgentDefinition?> _agent;
     private readonly Func<IAgentConnection>? _factory;
     private readonly SemaphoreSlim _gate = new(1);
-    private readonly SemaphoreSlim _execution = new(1);
     private readonly object _sync = new();
     private readonly CancellationTokenSource _lifetime = new();
     private readonly HashSet<string> _seenCalls = [];
@@ -89,6 +88,9 @@ internal sealed class AcpChatService : ObservableObject, IChatServiceWithParalle
         public string Model { get; } = model;
         public long ToolsRevision { get; } = toolsRevision;
         public CancellationTokenSource Cancellation { get; } = CancellationTokenSource.CreateLinkedTokenSource(token);
+        // Serialize this prompt's host calls without letting a handler that ignores cancellation
+        // block a later prompt after Stop.
+        public SemaphoreSlim Execution { get; } = new(1);
         public ConcurrentDictionary<string, TaskCompletionSource<JsonElement>> Calls { get; } = new();
         public HashSet<string> Claimed { get; } = [];
         public Dictionary<string, AcpRuntimeToolCall> BackendCalls { get; } = [];
@@ -3414,7 +3416,7 @@ internal sealed class AcpChatService : ObservableObject, IChatServiceWithParalle
             lock (_sync)
                 if (!Current(turn) || !turn.Claimed.Add(id))
                     return OneWareMcpResult.Failure("This ACP tool call is stale or has already been handled.");
-            await _execution.WaitAsync(token);
+            await turn.Execution.WaitAsync(token);
             try
             {
                 if (!turn.Tools.TryGetValue(name, out var tool) ||
@@ -3488,7 +3490,7 @@ internal sealed class AcpChatService : ObservableObject, IChatServiceWithParalle
             }
             finally
             {
-                _execution.Release();
+                turn.Execution.Release();
             }
         }
         catch (OperationCanceledException)

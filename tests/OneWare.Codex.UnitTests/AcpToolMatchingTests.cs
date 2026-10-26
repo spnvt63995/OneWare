@@ -7,6 +7,128 @@ namespace OneWare.Codex.UnitTests;
 
 public sealed class AcpToolMatchingTests
 {
+    [AvaloniaFact]
+    public async Task AbortDuringInvocationDoesNotBlockToolsInTheNextPrompt()
+    {
+        await using var h = new AcpHarness(confirm: true);
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completions = new List<AiFunctionCompletedEvent>();
+        h.Provider.FunctionCompleted += (_, e) => completions.Add(e);
+        CancellationToken toolToken = default;
+        h.Provider.RegisterFunction(new OneWareAiFunction
+        {
+            Name = "blocked_fixture", Description = "Waits even after its prompt is cancelled.", IsReadOnly = true,
+            Handler = (Func<string, string>)(value => value),
+            InvocationHandler = (_, _, token) =>
+            {
+                toolToken = token;
+                entered.TrySetResult(true);
+                return new ValueTask<object?>(release.Task);
+            }
+        });
+        var send = h.Service.SendAsync("start the old tool");
+        await h.Peer.PromptStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var oldCall = h.Peer.CallTool("old", "blocked_fixture", new { value = "old" });
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var oldStart = Assert.Single(h.Starts);
+            await h.Service.AbortAsync().WaitAsync(TimeSpan.FromSeconds(10));
+            await send;
+            Assert.True(toolToken.IsCancellationRequested);
+            Assert.False(release.Task.IsCompleted);
+            Assert.Empty(completions);
+
+            h.Peer.ResetPrompt();
+            var next = h.Service.SendAsync("run the next tool without waiting");
+            await h.Peer.PromptStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var nextCall = h.Peer.CallTool("new", "acp_fixture", new { value = "new" });
+            await AcpHarness.Until(() => h.Events.OfType<ChatPermissionRequestEvent>().Any());
+            Assert.Single(h.Events.OfType<ChatPermissionRequestEvent>()).AllowCommand.Execute(null);
+            var result = await nextCall.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.False(result.GetProperty("isError").GetBoolean());
+            Assert.Equal(JsonSerializer.Serialize("ACP_FIXTURE_new"),
+                result.GetProperty("content")[0].GetProperty("text").GetString());
+            Assert.False(release.Task.IsCompleted);
+            var nextStart = Assert.Single(h.Starts, x => x.ToolCallId == "new");
+            Assert.NotEqual(oldStart.Id, nextStart.Id);
+            Assert.Equal(nextStart.Id, Assert.Single(completions).Id);
+
+            release.TrySetResult("old result");
+            await AcpHarness.Until(() => completions.Any(x => x.Id == oldStart.Id));
+            Assert.Equal(2, completions.Count);
+            Assert.False(next.IsCompleted);
+            h.Peer.Complete();
+            await next;
+        }
+        finally
+        {
+            release.TrySetResult("old result");
+            // Abort closes the old HTTP endpoint even when the host handler keeps running.
+            try
+            {
+                await oldCall.WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            catch (HttpRequestException)
+            {
+            }
+            catch (JsonException ex) when (ex.LineNumber == 0 && ex.BytePositionInLine == 0)
+            {
+                // The closed endpoint may return an empty body instead of a transport error.
+            }
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task CallsWithinOnePromptStillWaitForTheRunningToolBeforeAskingApproval()
+    {
+        await using var h = new AcpHarness(confirm: true);
+        var entered = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        h.Provider.RegisterFunction(new OneWareAiFunction
+        {
+            Name = "blocked_fixture", Description = "Holds the first tool until the fixture releases it.",
+            IsReadOnly = true,
+            Handler = (Func<string, string>)(value => value),
+            InvocationHandler = (_, _, _) =>
+            {
+                entered.TrySetResult(true);
+                return new ValueTask<object?>(release.Task);
+            }
+        });
+        var send = h.Service.SendAsync("run tools in one prompt");
+        await h.Peer.PromptStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        var first = h.Peer.CallTool("first", "blocked_fixture", new { value = "first" });
+        try
+        {
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            var calls = Enumerable.Range(0, 2).Select(_ =>
+                h.Peer.CallTool("second", "acp_fixture", new { value = "second" })).ToArray();
+            // A rejected duplicate proves the other request has claimed the call.
+            var duplicate = await Task.WhenAny(calls).WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.True((await duplicate).GetProperty("isError").GetBoolean());
+            var pending = Assert.Single(calls, call => call != duplicate);
+            Assert.False(pending.IsCompleted);
+            Assert.Empty(h.Events.OfType<ChatPermissionRequestEvent>());
+            Assert.Single(h.Starts);
+
+            release.TrySetResult("first result");
+            Assert.False((await first).GetProperty("isError").GetBoolean());
+            await AcpHarness.Until(() => h.Events.OfType<ChatPermissionRequestEvent>().Any());
+            Assert.Single(h.Events.OfType<ChatPermissionRequestEvent>()).AllowCommand.Execute(null);
+            Assert.False((await pending).GetProperty("isError").GetBoolean());
+            Assert.Equal(2, h.Starts.Count);
+            h.Peer.Complete();
+            await send;
+        }
+        finally
+        {
+            release.TrySetResult("first result");
+            await first.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+    }
+
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]

@@ -101,6 +101,10 @@ Each chat view and delegated child owns its ACP connection and active prompt. Th
 shares account operations and conversation-keyed approval memory. Moving members between files does
 not change that ownership.
 
+Host tool calls run one at a time within a prompt. After Stop, a new prompt does not wait for a tool
+from the cancelled prompt to finish. Cancellation remains cooperative: a plugin that ignores it may
+continue running alongside the new request.
+
 The other files group state and integration responsibilities. They are not additional registered chat
 services, and a separate type does not necessarily require a separate file.
 
